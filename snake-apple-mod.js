@@ -1156,65 +1156,36 @@ window.levelEditorMod.alterSnakeCode = function(code) {
   //Taken from shared.js
   ///////////////////////////////////////
 
-  //Copied from Pythag
   globalThis.tileWidth = code.assertMatch(/[a-z]\.[$a-zA-Z0-9_]{0,8}\.fillRect\([a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,8}\.([$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}),[a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8},[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8},[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\)/)[1];//wa
-
-  //setup for being able to move apples
-  //Copied from gravity, but adjusted to be global and use code. intead of funcWithEat. and capturing groups adjusted.
   [,globalThis.applePosProperty, globalThis.appleSpeedProperty] = code.assertMatch(/&&\([$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.x&&\([$a-zA-Z0-9_]{0,8}\.([$a-zA-Z0-9_]{0,8})\.x\+=[$a-zA-Z0-9_]{0,8}\.([$a-zA-Z0-9_]{0,8})\.x\),/);
-
-  //Lifted from pythag
   globalThis.bodyArray = code.assertMatch(/[a-z]=\n?this\.[$a-zA-Z0-9_]{0,8}\.([$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8})\[0\]\.clone\(\),"LEFT"/)[1];
-
   globalThis.makeApple = code.assertMatch(/this\.[$a-zA-Z0-9_]{0,8}\.push\(([$a-zA-Z0-9_]{0,8})\(this,-5,-4\)\)/)[1];
   globalThis.appleArray = code.assertMatch(/this\.([$a-zA-Z0-9_]{0,8})\.push\([$a-zA-Z0-9_]{0,8}\(this,-6,-3\)\)/)[1];
-
-  //whole snake object has an object which in turn has the appleArray. (It's messy I know)
   globalThis.appleArrayHolderOfWholeSnakeObject = code.assertMatch(/this\.([$a-zA-Z0-9_]{0,8})\.reset\(\);this\.[$a-zA-Z0-9_]{0,8}=!1;/)[1];
-
-  //globalThis.coordConstructor = swapInSnakeGlobal(code.assertMatch(/new (_\.[$a-zA-Z0-9_]{0,8})\(1,1\)/)[1]);
   globalThis.coordConstructor = code.assertMatch(/new (_\.[$a-zA-Z0-9_]{0,8})\(1,1\)/)[1];
-
-  //Board dimensions - found in wholeSnakeObject, has width, height properties
   globalThis.boardDimensions = code.assertMatch(/x===Math.floor\([a-z]\.[$a-zA-Z0-9_]{0,8}\.([$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8})\.width\/2\)&&/)[1];
-
-  //Checks whether we are playing a specific mode e.g. VK(this.settings,2) is true if we are playing portal
   let [,modeCheck, settingsProperty] = code.assertMatch(/([$a-zA-Z0-9_]{0,8})\(this\.([$a-zA-Z0-9_]{0,8}),6\)/);
 
-  //Set snakeGlobalObject every reset
   let funcWithReset, funcWithResetOrig;
   funcWithReset = funcWithResetOrig = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,8}\.reset=function\(\)$/,
   /[a-z]=\n?\.66/,
   false);
 
-  funcWithReset = assertReplace(funcWithReset,'{','{globalThis.wholeSnakeObject = this;');//This line is changed slightly from varied.js
-
-  funcWithReset = assertReplace(funcWithReset, /[$a-zA-Z0-9_]{0,8}\([a-z]\.[$a-zA-Z0-9_]{0,8}\)&&\([a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}=!0\)\)/,
-    `$&;window.simpleHookManager.runHook('afterResetBoard')`);
-
+  funcWithReset = assertReplace(funcWithReset,'{','{globalThis.wholeSnakeObject = this;');
+  funcWithReset = assertReplace(funcWithReset, /[$a-zA-Z0-9_]{0,8}\([a-z]\.[$a-zA-Z0-9_]{0,8}\)&&\([a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}=!0\)\)/, `$&;window.simpleHookManager.runHook('afterResetBoard')`);
   code = code.replace(funcWithResetOrig, funcWithReset);
 
-  //Get the object that contains the wholeSnakeObject.
   let funcWithResetState, funcWithResetStateOrig;
-  funcWithResetState = funcWithResetStateOrig = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,8}\.prototype\.resetState=function\(a\)$/,
-  /void 0===[a-z]\?!0:[a-z];this\.[$a-zA-Z0-9_]{0,8}\.reset\(a\);/);
-
+  funcWithResetState = funcWithResetStateOrig = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,8}\.prototype\.resetState=function\(a\)$/, /void 0===[a-z]\?!0:[a-z];this\.[$a-zA-Z0-9_]{0,8}\.reset\(a\);/);
   funcWithResetState = assertReplace(funcWithResetState, '{', '{globalThis.megaWholeSnakeObject = this;');
-
   code = code.replace(funcWithResetStateOrig, funcWithResetState);
 
-  ///////////////////////////////////////
-  //Taken from level-editor.js
-  ///////////////////////////////////////
-
-  //Make a function that empties apples
   (0,eval)(`
   function emptyApples() {
     window.wholeSnakeObject.${appleArrayHolderOfWholeSnakeObject}.${appleArray}.length = 0;
   }
   `);
 
-  //Make a function to place an apple
   code = appendCodeWithinSnakeModule(code, `
   globalThis.placeApple = function(x,y,type,initialSpeed=undefined,customProperties={}) {
     let apple = ${makeApple}(window.wholeSnakeObject.${appleArrayHolderOfWholeSnakeObject}, x, y);
@@ -1229,11 +1200,8 @@ window.levelEditorMod.alterSnakeCode = function(code) {
   `, false);
 
   let wallDetailsContainer = code.assertMatch(/[$a-zA-Z0-9_]{0,8}&&\([$a-zA-Z0-9_]{0,8}\(this\.([$a-zA-Z0-9_]{0,8}),\n?[$a-zA-Z0-9_]{0,8}\),\n?[$a-zA-Z0-9_]{0,8}\(this\.[$a-zA-Z0-9_]{0,8},7\)/)[1];
-
-  //Setup for being able to place walls
   let [,placeWallFunc,wallCoordProperty,otherProperty1,fakeWallProperty,otherProperty2] = code.assertMatch(/([$a-zA-Z0-9_]{0,8})\(this,[a-z],{([$a-zA-Z0-9_]{0,8}):[a-z],([$a-zA-Z0-9_]{0,8}:!1),([$a-zA-Z0-9_]{0,8}):!0,([$a-zA-Z0-9_]{0,8}:!0)}\)/);
 
-  //Make a function to place a wall
   code = appendCodeWithinSnakeModule(code, `
   globalThis.placeWall = function(x, y, banNeighbourSpawning = false) {
     if(!${modeCheck}(window.wholeSnakeObject.${settingsProperty}, 1) && !window.hasShownWarnings.wall) {
@@ -1256,8 +1224,6 @@ window.levelEditorMod.alterSnakeCode = function(code) {
   `, false);
 
   let wallSet = code.assertMatch(/([$a-zA-Z0-9_]{0,8})\.set\([$a-zA-Z0-9_]{0,8}\([a-z]\),[a-z]\);/)[1];
-
-  //Make a function to check if a wall exists at a given coordinate
   code = appendCodeWithinSnakeModule(code, `
   globalThis.checkWall = function(x,y) {
     if(x < 0 || x >= window.wholeSnakeObject.${boardDimensions}.width || y < 0 || y >= window.wholeSnakeObject.${boardDimensions}.height) {
@@ -1271,27 +1237,18 @@ window.levelEditorMod.alterSnakeCode = function(code) {
   `, false);
 
   let funcWithPlaceWall, funcWithPlaceWallOrig;
-  funcWithPlaceWall = funcWithPlaceWallOrig = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,8}=function\(a,\n?b\)$/,
-  /[$a-zA-Z0-9_]{0,8}\([a-z],[a-z],{[$a-zA-Z0-9_]{0,8}:[a-z],[$a-zA-Z0-9_]{0,8}:!0,[$a-zA-Z0-9_]{0,8}:!1,\n?[$a-zA-Z0-9_]{0,8}:![$a-zA-Z0-9_]{0,8}\([a-z]\.[$a-zA-Z0-9_]{0,8},\n?11\)}\);/,
-  false);
-
-  funcWithPlaceWall = assertReplace(funcWithPlaceWall, '{',
-  `{
+  funcWithPlaceWall = funcWithPlaceWallOrig = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,8}=function\(a,\n?b\)$/, /[$a-zA-Z0-9_]{0,8}\([a-z],[a-z],{[$a-zA-Z0-9_]{0,8}:[a-z],[$a-zA-Z0-9_]{0,8}:!0,[$a-zA-Z0-9_]{0,8}:!1,\n?[$a-zA-Z0-9_]{0,8}:![$a-zA-Z0-9_]{0,8}\([a-z]\.[$a-zA-Z0-9_]{0,8},\n?11\)}\);/, false);
+  funcWithPlaceWall = assertReplace(funcWithPlaceWall, '{', `{
   if(disableWallMode) {
     return;
   }
   `);
-
   code = code.replace(funcWithPlaceWallOrig, funcWithPlaceWall);
 
   let sokoDetailsContainer = code.assertMatch(/this\.([$a-zA-Z0-9_]{0,8})\.reset\(\);if\([$a-zA-Z0-9_]{0,8}\(this\.[$a-zA-Z0-9_]{0,8},8\)/)[1];
-
-  //Setup for placing sokoban boxes
   let [, addSokoboxFunc, sokoPosition, sokoPrevProperty, sokoPlaySpawnAnimProperty, sokoLastProperty] = code.assertMatch(/([$a-zA-Z0-9_]{0,8})\([a-z],{([$a-zA-Z0-9_]{0,8}):[a-z],\n?([$a-zA-Z0-9_]{0,8}):null,([$a-zA-Z0-9_]{0,8}):!0,([$a-zA-Z0-9_]{0,8}):[a-z]}\)/);
-
   let sokoboxSet = code.assertMatch(/[a-z]\.([$a-zA-Z0-9_]{0,8})\.add\([a-z]\);[$a-zA-Z0-9_]{0,8}\([a-z]\.settings,16\)/)[1];
 
-  //Make a function to place a sokobox
   code = appendCodeWithinSnakeModule(code, `
   globalThis.placeSokobox = function(x,y) {
     if(!${modeCheck}(window.wholeSnakeObject.${settingsProperty}, 9) && !window.hasShownWarnings.sokoban) {
@@ -1313,84 +1270,46 @@ window.levelEditorMod.alterSnakeCode = function(code) {
   `, false);
 
   let sokogoalSet = code.assertMatch(/[$a-zA-Z0-9_]{0,8}\([a-z]\.[$a-zA-Z0-9_]{0,8},\n?7\)&&[a-z]\.([$a-zA-Z0-9_]{0,8})\.add\([$a-zA-Z0-9_]{0,8}\([a-z]\.[$a-zA-Z0-9_]{0,8},\n?[a-z]\)\),/)[1];
-
-  //Make a function that removes sokoban goals
   code = appendCodeWithinSnakeModule(code, `
   globalThis.emptySokogoals = function(x,y) {
     window.wholeSnakeObject.${sokoDetailsContainer}.${sokogoalSet}.clear();
   }
   `, false);
-
-  //Also have a function for emptying sokoboxes
   code = appendCodeWithinSnakeModule(code, `
   globalThis.emptySokoboxes = function(x,y) {
     window.wholeSnakeObject.${sokoDetailsContainer}.${sokoboxSet}.clear();
   }
   `, false);
 
-  //Allow customising which position the snake starts from
   let funcWithSnakeStartPos, funcWithSnakeStartPosOrig;
-  funcWithSnakeStartPos = funcWithSnakeStartPosOrig = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,8}\.prototype\.reset=function\(\)$/,
-    /this\.[$a-zA-Z0-9_]{0,8}\.push\(new _\.[$a-zA-Z0-9_]{0,8}\(Math\.floor\(this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.width\/4\),Math\.floor\(this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.height\/2\)\)\);/,
-    false);
-
-  funcWithSnakeStartPos = assertReplace(funcWithSnakeStartPos,
-    /this\.([$a-zA-Z0-9_]{0,8})\.push\(new [^]*3,Math\.floor\(this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.height\/\n?2\)\)\);/,
-    `setSelectedSnakeHead();
+  funcWithSnakeStartPos = funcWithSnakeStartPosOrig = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,8}\.prototype\.reset=function\(\)$/, /this\.[$a-zA-Z0-9_]{0,8}\.push\(new _\.[$a-zA-Z0-9_]{0,8}\(Math\.floor\(this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.width\/4\),Math\.floor\(this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.height\/2\)\)\);/, false);
+  funcWithSnakeStartPos = assertReplace(funcWithSnakeStartPos, /this\.([$a-zA-Z0-9_]{0,8})\.push\(new [^]*3,Math\.floor\(this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.height\/\n?2\)\)\);/, `setSelectedSnakeHead();
     if(customSnakeStart.isActive) {
       this.$1.push(new ${window.coordConstructor}(customSnakeStart.x, customSnakeStart.y));
       this.$1.push(new ${window.coordConstructor}(customSnakeStart.x - 1, customSnakeStart.y));
       this.$1.push(new ${window.coordConstructor}(customSnakeStart.x - 2, customSnakeStart.y));
       this.$1.push(new ${window.coordConstructor}(customSnakeStart.x - 3, customSnakeStart.y));
     } else {$&}`);
-
   code = code.replace(funcWithSnakeStartPosOrig, funcWithSnakeStartPos);
 
-  //Func used to change settings in the menu
-  let funcWithChangeSetting = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,8}=function\(a,b,c,d\)$/,
-  /case "apple":[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}=[a-z];break;/,
-  false);
-
-  //Just need the name of this function so we can call it.
+  let funcWithChangeSetting = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,8}=function\(a,b,c,d\)$/, /case "apple":[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}=[a-z];break;/, false);
   globalThis.changeSettingFuncName = /[$a-zA-Z0-9_]{0,8}/.exec(funcWithChangeSetting)[0];
-
-  //Menu property - same regex as below
   let menuProperty = code.assertMatch(/if\(this\.([$a-zA-Z0-9_]{0,8})\.isVisible\(\)\|\|this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\)/)[1];
-
-  //Func used to do a full reset (simulating click play from menu button?)
-  let funcWithFullReset = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,8}=function\(\)$/,
-  /if\(this\.[$a-zA-Z0-9_]{0,8}\.isVisible\(\)\|\|this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\)/,
-  false);
-
-  //Just need the name of this function so we can call it.
+  let funcWithFullReset = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,8}=function\(\)$/, /if\(this\.[$a-zA-Z0-9_]{0,8}\.isVisible\(\)\|\|this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\)/, false);
   globalThis.fullResetFuncName = /[$a-zA-Z0-9_]{0,8}/.exec(funcWithFullReset)[0];
 
-  //Changes the size setting that is selected in the menu
-  //newSize - 0 for normal, 1 for small, 2 for large
   code = appendCodeWithinSnakeModule(code, `
   globalThis.selectNewSizeSettingAndHardReset = function(newSizeSetting) {
-    //Change size setting
     if(typeof window.megaWholeSnakeObject !== 'undefined' && newSizeSetting !== null) {
       let sizeEl = document.getElementById('size');
       ${changeSettingFuncName}(window.megaWholeSnakeObject.${menuProperty},sizeEl,true,newSizeSetting);
-  
-      //Also need to reposition and centralise the selected size in the menu. This is quite hacky.
       switch(newSizeSetting) {
-        case 0:
-          sizeEl.style.left = '129.25px';
-          break;
-        case 1:
-          sizeEl.style.left = '91.5px';
-          break;
-        case 2:
-          sizeEl.style.left = '51.5px';
-          break;
-        default:
-          throw new Error('Unsupported size setting.');
+        case 0: sizeEl.style.left = '129.25px'; break;
+        case 1: sizeEl.style.left = '91.5px'; break;
+        case 2: sizeEl.style.left = '51.5px'; break;
+        default: throw new Error('Unsupported size setting.');
       }
     }
-  
-    //Hard reset
     if(typeof window.megaWholeSnakeObject !== 'undefined') {
       window.megaWholeSnakeObject.${menuProperty}.visible = true;
       window.megaWholeSnakeObject[fullResetFuncName]();
@@ -1399,83 +1318,91 @@ window.levelEditorMod.alterSnakeCode = function(code) {
   }
   `,false);
 
-  // --- НАЧАЛО ИСПРАВЛЕНИЙ ДЛЯ РЕСПАВНА ЯБЛОК ---
+  // --- НАЧАЛО ИСПРАВЛЕНИЙ ДЛЯ РЕСПАВНА ЯБЛОК (v3) ---
   try {
-    // Это новое, более надежное регулярное выражение.
-    // Оно ищет функцию по ее СТРУКТУРЕ: функция, которая принимает один аргумент "a",
-    // содержит цикл do...while, внутри которого есть Math.random(),
-    // и которая возвращает новый объект с координатами.
-    const appleSpawnerRegex = /([$a-zA-Z0-9_]{0,8})=function\(a\){var b,c;do{b=Math\.floor\(Math\.random\(\)\*a\.([$a-zA-Z0-9_]{0,8})\.width\),c=Math\.floor\(Math\.random\(\)\*a\.[$a-zA-Z0-9_]{0,8}\.height\)}while\(!a\.([$a-zA-Z0-9_]{0,8})\(b,c\)\);return new ([$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8})\(b,c\)}/;
-    
-    const appleSpawnerMatch = code.match(appleSpawnerRegex);
+    // Этап 1: Находим функцию, где змейка растет. Она содержит ".unshift(this..." и ".clone()"
+    const growthFuncRegex = /[$a-zA-Z0-9_]{0,8}\.prototype\.[$a-zA-Z0-9_]{0,8}=function\(a\){this\.([$a-zA-Z0-9_]{0,8})\.unshift\(this\.\1\[0\]\.clone\(\)\);.*this\.([$a-zA-Z0-9_]{0,8})\.push\(([$a-zA-Z0-9_]{0,8})\(this\)\)}/;
+    const growthFuncMatch = code.match(growthFuncRegex);
 
-    if (appleSpawnerMatch) {
-      // Извлекаем "динамические" имена из найденного кода игры
-      const spawnerFuncName = appleSpawnerMatch[1];
-      const boardState = appleSpawnerMatch[2];
-      const isTileFreeCheck = appleSpawnerMatch[3];
-      const coordConstructor = appleSpawnerMatch[4];
-      const originalSpawnerFunc = appleSpawnerMatch[0];
+    if (growthFuncMatch) {
+      // Этап 2: Извлекаем из нее имя функции-спавнера яблок.
+      const spawnerFuncName = growthFuncMatch[3];
 
-      // Получаем массив тела змейки из уже найденной глобальной переменной
-      const snakeBodyArray = `a.${window.bodyArray.split('.')[1]}`;
+      // Этап 3: Теперь, зная имя, находим полное определение функции-спавнера.
+      const appleSpawnerRegex = new RegExp(`(${spawnerFuncName}=function\\(a\\){.*?return new.*?\\(b,c\\)})`);
+      const appleSpawnerMatch = code.match(appleSpawnerRegex);
 
-      // Создаем нашу новую, улучшенную функцию, используя захваченные имена
-      const newSpawnerFunc = `
-      ${spawnerFuncName} = function(a) {
-        const snakeHead = ${snakeBodyArray}[0];
-        const boardWidth = a.${boardState}.width;
-        const boardHeight = a.${boardState}.height;
-        const searchRadius = 5; // Радиус поиска 5x5 вокруг головы змейки
-        let b, c; // Координаты x, y
-        let isPositionValid = false;
-        let attempts = 0;
-        const maxAttempts = 50; // Предотвращает зависание
+      if (appleSpawnerMatch) {
+        const originalSpawnerFunc = appleSpawnerMatch[1];
+        
+        // Извлекаем "динамические" имена из найденного кода
+        const boardState = originalSpawnerFunc.match(/a\.(.*?)\.width/)[1];
+        const isTileFreeCheck = originalSpawnerFunc.match(/while\(!a\.(.*?)\(b,c\)\)/)[1];
+        const coordConstructor = originalSpawnerFunc.match(/return new (.*?)\(b,c\)/)[1];
+        
+        const snakeBodyArray = `a.${window.bodyArray.split('.')[1]}`;
 
-        // 90% шанс появиться рядом
-        const spawnNearChance = 0.9; 
+        // Этап 4: Создаем нашу новую функцию и заменяем старую.
+        const newSpawnerFunc = `
+        ${spawnerFuncName} = function(a) {
+          const snakeHead = ${snakeBodyArray}[0];
+          const boardWidth = a.${boardState}.width;
+          const boardHeight = a.${boardState}.height;
+          const searchRadius = 5;
+          let b, c;
+          let isPositionValid = false;
+          let attempts = 0;
+          const maxAttempts = 50;
+          const spawnNearChance = 0.9;
 
-        if (Math.random() < spawnNearChance) {
-          while (!isPositionValid && attempts < maxAttempts) {
-            attempts++;
-            const offsetX = Math.floor(Math.random() * (2 * searchRadius + 1)) - searchRadius;
-            const offsetY = Math.floor(Math.random() * (2 * searchRadius + 1)) - searchRadius;
-            
-            b = snakeHead.x + offsetX;
-            c = snakeHead.y + offsetY;
+          if (snakeHead && Math.random() < spawnNearChance) {
+            while (!isPositionValid && attempts < maxAttempts) {
+              attempts++;
+              const offsetX = Math.floor(Math.random() * (2 * searchRadius + 1)) - searchRadius;
+              const offsetY = Math.floor(Math.random() * (2 * searchRadius + 1)) - searchRadius;
+              
+              b = snakeHead.x + offsetX;
+              c = snakeHead.y + offsetY;
 
-            // Проверяем, что позиция валидна (в пределах поля и не занята)
-            if (b >= 0 && b < boardWidth && c >= 0 && c < boardHeight && a.${isTileFreeCheck}(b, c)) {
-              isPositionValid = true;
+              if (b >= 0 && b < boardWidth && c >= 0 && c < boardHeight && a.${isTileFreeCheck}(b, c)) {
+                isPositionValid = true;
+              }
             }
           }
-        }
 
-        // Если не нашли место рядом (или попали в 10% шанс), ищем случайное место
-        if (!isPositionValid) {
-          do {
-            b = Math.floor(Math.random() * boardWidth);
-            c = Math.floor(Math.random() * boardHeight);
-          } while (!a.${isTileFreeCheck}(b, c));
-        }
-        
-        // Возвращаем новый объект с координатами, используя "динамический" конструктор
-        return new ${coordConstructor}(b, c);
-      }`;
+          if (!isPositionValid) {
+            do {
+              b = Math.floor(Math.random() * boardWidth);
+              c = Math.floor(Math.random() * boardHeight);
+            } while (!a.${isTileFreeCheck}(b, c));
+          }
+          
+          return new ${coordConstructor}(b, c);
+        }`;
 
-      // Заменяем старую функцию на новую в коде игры
-      code = code.replace(originalSpawnerFunc, newSpawnerFunc);
-      console.log("Логика появления яблок успешно изменена!");
+        code = code.replace(originalSpawnerFunc, newSpawnerFunc);
+        console.log("Логика появления яблок УСПЕШНО изменена (метод v3)!");
+
+      } else {
+        console.error("Критическая ошибка: найдена функция роста змейки, но не найдена функция спавна яблок по имени: " + spawnerFuncName);
+      }
     } else {
-      console.error("Не удалось найти функцию спавна яблок. Возможно, игра снова обновилась.");
+      console.error("Не удалось найти ключевую функцию роста змейки. Мод не может быть применен. Игра обновилась.");
     }
   } catch (err) {
-    console.error("Произошла ошибка при попытке изменить логику появления яблок:", err);
+    console.error("Произошла непредвиденная ошибка при попытке изменить логику появления яблок:", err);
   }
   // --- КОНЕЦ ИСПРАВЛЕНИЙ ---
 
   return code;
 }
+
+
+
+
+
+
+
 ////////////////////////////////////////////////////////////////////
 //RUNCODEAFTER
 ////////////////////////////////////////////////////////////////////
