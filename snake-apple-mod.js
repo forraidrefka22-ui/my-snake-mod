@@ -1231,11 +1231,6 @@ window.levelEditorMod.alterSnakeCode = function(code) {
   let wallDetailsContainer = code.assertMatch(/[$a-zA-Z0-9_]{0,8}&&\([$a-zA-Z0-9_]{0,8}\(this\.([$a-zA-Z0-9_]{0,8}),\n?[$a-zA-Z0-9_]{0,8}\),\n?[$a-zA-Z0-9_]{0,8}\(this\.[$a-zA-Z0-9_]{0,8},7\)/)[1];
 
   //Setup for being able to place walls
-  //For reference, we are matching the check for placing the "middle" wall in yinyang
-  /*
-  this.yb.push({Jb: a,Wm: !1,vz: -1,DH: !0,Th: !0}),
-  */
-  //let [,placeWallFunc,wallCoordProperty,otherProperty1,fakeWallProperty,otherProperty2] = code.match(/([$a-zA-Z0-9_]{0,8})\(this,[a-z],{([$a-zA-Z0-9_]{0,8}):[a-z],([$a-zA-Z0-9_]{0,8}:!1,[$a-zA-Z0-9_]{0,8}:-1),([$a-zA-Z0-9_]{0,8}):!0,([$a-zA-Z0-9_]{0,8}:!0,[$a-zA-Z0-9_]{0,8}:void 0)}\)/);
   let [,placeWallFunc,wallCoordProperty,otherProperty1,fakeWallProperty,otherProperty2] = code.assertMatch(/([$a-zA-Z0-9_]{0,8})\(this,[a-z],{([$a-zA-Z0-9_]{0,8}):[a-z],([$a-zA-Z0-9_]{0,8}:!1),([$a-zA-Z0-9_]{0,8}):!0,([$a-zA-Z0-9_]{0,8}:!0)}\)/);
 
   //Make a function to place a wall
@@ -1275,11 +1270,8 @@ window.levelEditorMod.alterSnakeCode = function(code) {
   }
   `, false);
 
-  //Probably should've used this function instead of placeWall method with manually pushing to an array, but OH WELL.
-
   let funcWithPlaceWall, funcWithPlaceWallOrig;
   funcWithPlaceWall = funcWithPlaceWallOrig = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,8}=function\(a,\n?b\)$/,
-  ///[$a-zA-Z0-9_]{0,8}\([a-z],[a-z],{[$a-zA-Z0-9_]{0,8}:[a-z],[$a-zA-Z0-9_]{0,8}:!0,[$a-zA-Z0-9_]{0,8}:-1,[$a-zA-Z0-9_]{0,8}:!1,\n?[$a-zA-Z0-9_]{0,8}:![$a-zA-Z0-9_]{0,8}\([a-z]\.settings,11\),[$a-zA-Z0-9_]{0,8}:void 0}\);/,
   /[$a-zA-Z0-9_]{0,8}\([a-z],[a-z],{[$a-zA-Z0-9_]{0,8}:[a-z],[$a-zA-Z0-9_]{0,8}:!0,[$a-zA-Z0-9_]{0,8}:!1,\n?[$a-zA-Z0-9_]{0,8}:![$a-zA-Z0-9_]{0,8}\([a-z]\.[$a-zA-Z0-9_]{0,8},\n?11\)}\);/,
   false);
 
@@ -1337,7 +1329,6 @@ window.levelEditorMod.alterSnakeCode = function(code) {
   `, false);
 
   //Allow customising which position the snake starts from
-
   let funcWithSnakeStartPos, funcWithSnakeStartPosOrig;
   funcWithSnakeStartPos = funcWithSnakeStartPosOrig = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,8}\.prototype\.reset=function\(\)$/,
     /this\.[$a-zA-Z0-9_]{0,8}\.push\(new _\.[$a-zA-Z0-9_]{0,8}\(Math\.floor\(this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.width\/4\),Math\.floor\(this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.height\/2\)\)\);/,
@@ -1408,80 +1399,80 @@ window.levelEditorMod.alterSnakeCode = function(code) {
   }
   `,false);
 
-  // --- НАЧАЛО ИЗМЕНЕНИЙ ДЛЯ РЕСПАВНА ЯБЛОК ---
+  // --- НАЧАЛО ИСПРАВЛЕНИЙ ДЛЯ РЕСПАВНА ЯБЛОК ---
   try {
-    // Ищем функцию, которая вызывается при съедании яблока (в ней змейка растет)
-    const eatAppleFunc = findFunctionInCode(code, null, /this\.[$a-zA-Z0-9_]{0,8}\.unshift\(this\.[$a-zA-Z0-9_]{0,8}\[0\]\.clone\(\)\)/, true);
-    // Внутри этой функции ищем вызов, который добавляет новое яблоко. Например: this.appleArray.push(getAppleCoordsFunc(this))
-    const addAppleCallMatch = eatAppleFunc.match(/this\.([$a-zA-Z0-9_]{0,8})\.push\(([$a-zA-Z0-9_]{0,8})\(this\)\)/);
+    // Это новое, более надежное регулярное выражение.
+    // Оно ищет функцию по ее СТРУКТУРЕ: функция, которая принимает один аргумент "a",
+    // содержит цикл do...while, внутри которого есть Math.random(),
+    // и которая возвращает новый объект с координатами.
+    const appleSpawnerRegex = /([$a-zA-Z0-9_]{0,8})=function\(a\){var b,c;do{b=Math\.floor\(Math\.random\(\)\*a\.([$a-zA-Z0-9_]{0,8})\.width\),c=Math\.floor\(Math\.random\(\)\*a\.[$a-zA-Z0-9_]{0,8}\.height\)}while\(!a\.([$a-zA-Z0-9_]{0,8})\(b,c\)\);return new ([$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8})\(b,c\)}/;
     
-    if (addAppleCallMatch) {
-      const appleSpawnerFuncName = addAppleCallMatch[2];
-      // Теперь находим саму функцию, которая генерирует координаты для яблока
-      const appleSpawnerRegex = new RegExp(`(${appleSpawnerFuncName}=function\\(a\\){.*?return new.*?\\(b,c\\)})`);
-      const appleSpawnerFuncMatch = code.match(appleSpawnerRegex);
+    const appleSpawnerMatch = code.match(appleSpawnerRegex);
 
-      if (appleSpawnerFuncMatch) {
-        const originalSpawnerFunc = appleSpawnerFuncMatch[1];
-        // Извлекаем нужные переменные из оригинальной функции с помощью регулярных выражений
-        const boardState = originalSpawnerFunc.match(/a\.([$a-zA-Z0-9_]{0,8})\.width/)[1];
-        const isTileFreeCheck = originalSpawnerFunc.match(/while\(!a\.([$a-zA-Z0-9_]{0,8})\(b,c\)\)/)[1];
-        const returnStatement = originalSpawnerFunc.match(/return new [^;]*;/)[0];
+    if (appleSpawnerMatch) {
+      // Извлекаем "динамические" имена из найденного кода игры
+      const spawnerFuncName = appleSpawnerMatch[1];
+      const boardState = appleSpawnerMatch[2];
+      const isTileFreeCheck = appleSpawnerMatch[3];
+      const coordConstructor = appleSpawnerMatch[4];
+      const originalSpawnerFunc = appleSpawnerMatch[0];
 
-        // Получаем массив тела змейки из уже найденной глобальной переменной
-        const snakeBodyArray = `a.${window.bodyArray.split('.')[1]}`;
+      // Получаем массив тела змейки из уже найденной глобальной переменной
+      const snakeBodyArray = `a.${window.bodyArray.split('.')[1]}`;
 
-        // Создаем нашу новую, улучшенную функцию
-        const newSpawnerFunc = `
-        ${appleSpawnerFuncName} = function(a) {
-          const snakeHead = ${snakeBodyArray}[0];
-          const boardWidth = a.${boardState}.width;
-          const boardHeight = a.${boardState}.height;
-          const searchRadius = 5; // Радиус поиска вокруг головы змейки (создает квадрат 11x11)
-          let b, c; // Координаты x, y
-          let isPositionValid = false;
-          let attempts = 0;
-          const maxAttempts = 50; // Предотвращает зависание, если рядом нет места
+      // Создаем нашу новую, улучшенную функцию, используя захваченные имена
+      const newSpawnerFunc = `
+      ${spawnerFuncName} = function(a) {
+        const snakeHead = ${snakeBodyArray}[0];
+        const boardWidth = a.${boardState}.width;
+        const boardHeight = a.${boardState}.height;
+        const searchRadius = 5; // Радиус поиска 5x5 вокруг головы змейки
+        let b, c; // Координаты x, y
+        let isPositionValid = false;
+        let attempts = 0;
+        const maxAttempts = 50; // Предотвращает зависание
 
-          // Вероятность появления рядом со змейкой. 0.9 = 90% шанс.
-          const spawnNearChance = 0.9; 
+        // 90% шанс появиться рядом
+        const spawnNearChance = 0.9; 
 
-          if (Math.random() < spawnNearChance) {
-            while (!isPositionValid && attempts < maxAttempts) {
-              attempts++;
-              const offsetX = Math.floor(Math.random() * (2 * searchRadius + 1)) - searchRadius;
-              const offsetY = Math.floor(Math.random() * (2 * searchRadius + 1)) - searchRadius;
-              
-              b = snakeHead.x + offsetX;
-              c = snakeHead.y + offsetY;
+        if (Math.random() < spawnNearChance) {
+          while (!isPositionValid && attempts < maxAttempts) {
+            attempts++;
+            const offsetX = Math.floor(Math.random() * (2 * searchRadius + 1)) - searchRadius;
+            const offsetY = Math.floor(Math.random() * (2 * searchRadius + 1)) - searchRadius;
+            
+            b = snakeHead.x + offsetX;
+            c = snakeHead.y + offsetY;
 
-              // Проверяем, что позиция валидна (в пределах поля и не занята)
-              if (b >= 0 && b < boardWidth && c >= 0 && c < boardHeight && a.${isTileFreeCheck}(b, c)) {
-                isPositionValid = true;
-              }
+            // Проверяем, что позиция валидна (в пределах поля и не занята)
+            if (b >= 0 && b < boardWidth && c >= 0 && c < boardHeight && a.${isTileFreeCheck}(b, c)) {
+              isPositionValid = true;
             }
           }
+        }
 
-          // Если не нашли место рядом (или попали в 10% шанс), ищем случайное место по всему полю
-          if (!isPositionValid) {
-            do {
-              b = Math.floor(Math.random() * boardWidth);
-              c = Math.floor(Math.random() * boardHeight);
-            } while (!a.${isTileFreeCheck}(b, c));
-          }
-          
-          // Возвращаем новый объект с координатами, как и в оригинальной функции
-          ${returnStatement}
-        }`;
+        // Если не нашли место рядом (или попали в 10% шанс), ищем случайное место
+        if (!isPositionValid) {
+          do {
+            b = Math.floor(Math.random() * boardWidth);
+            c = Math.floor(Math.random() * boardHeight);
+          } while (!a.${isTileFreeCheck}(b, c));
+        }
+        
+        // Возвращаем новый объект с координатами, используя "динамический" конструктор
+        return new ${coordConstructor}(b, c);
+      }`;
 
-        // Заменяем старую функцию на новую в коде игры
-        code = code.replace(originalSpawnerFunc, newSpawnerFunc);
-      }
+      // Заменяем старую функцию на новую в коде игры
+      code = code.replace(originalSpawnerFunc, newSpawnerFunc);
+      console.log("Логика появления яблок успешно изменена!");
+    } else {
+      console.error("Не удалось найти функцию спавна яблок. Возможно, игра снова обновилась.");
     }
   } catch (err) {
-    console.error("Не удалось изменить логику появления яблок:", err);
+    console.error("Произошла ошибка при попытке изменить логику появления яблок:", err);
   }
-  // --- КОНЕЦ ИЗМЕНЕНИЙ ---
+  // --- КОНЕЦ ИСПРАВЛЕНИЙ ---
 
   return code;
 }
