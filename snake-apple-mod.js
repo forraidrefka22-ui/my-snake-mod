@@ -1318,10 +1318,12 @@ window.levelEditorMod.alterSnakeCode = function(code) {
   }
   `,false);
 
-  // --- НАЧАЛО ИСПРАВЛЕНИЙ ДЛЯ РЕСПАВНА ЯБЛОК (v3) ---
+  // --- НАЧАЛО ИСПРАВЛЕНИЙ ДЛЯ РЕСПАВНА ЯБЛОК (v4, самый надежный) ---
   try {
     // Этап 1: Находим функцию роста змейки. Она содержит ".unshift(this..." и ".clone()", а также вызов функции спавна "... .push(...(this))"
-    const growthFuncRegex = /[$a-zA-Z0-9_]{0,8}\.prototype\.[$a-zA-Z0-9_]{0,8}=function\(a\){this\.([$a-zA-Z0-9_]{0,8})\.unshift\(this\.\1\[0\]\.clone\(\)\);.*this\.([$a-zA-Z0-9_]{0,8})\.push\(([$a-zA-Z0-9_]{0,8})\(this\)\)}/;
+    // Этот Regex более гибкий и должен выдерживать обновления. \.([$a-zA-Z0-9_]{0,8}) захватывает имя массива тела змейки.
+    // \2 - это обратная ссылка, чтобы убедиться, что в unshift и push используется один и тот же массив.
+    const growthFuncRegex = /([$a-zA-Z0-9_]{0,8}\.prototype\.[$a-zA-Z0-9_]{0,8})=function\([^)]*\){this\.([$a-zA-Z0-9_]{0,8})\.unshift\(this\.\2\[0\]\.clone\(\)\);.*?this\.\2\.push\(([$a-zA-Z0-9_]{0,8})\(this\)\)}/;
     const growthFuncMatch = code.match(growthFuncRegex);
 
     if (growthFuncMatch) {
@@ -1329,7 +1331,8 @@ window.levelEditorMod.alterSnakeCode = function(code) {
       const spawnerFuncName = growthFuncMatch[3];
 
       // Этап 3: Теперь, зная имя, находим полное определение функции-спавнера.
-      const appleSpawnerRegex = new RegExp(`(${spawnerFuncName}=function\\(a\\){.*?return new.*?\\(b,c\\)})`);
+      // Ищем ее по имени и общей структуре "do {...} while(...); return new ...;"
+      const appleSpawnerRegex = new RegExp(`(${spawnerFuncName}=function\\(a\\){.*?do{.*?}while\\(!a\\..*?\\(b,c\\)\\);return new.*?\\(b,c\\)})`);
       const appleSpawnerMatch = code.match(appleSpawnerRegex);
 
       if (appleSpawnerMatch) {
@@ -1340,6 +1343,7 @@ window.levelEditorMod.alterSnakeCode = function(code) {
         const isTileFreeCheck = originalSpawnerFunc.match(/while\(!a\.(.*?)\(b,c\)\)/)[1];
         const coordConstructor = originalSpawnerFunc.match(/return new (.*?)\(b,c\)/)[1];
         
+        // window.bodyArray - это глобальная переменная, которую мы нашли в самом начале. Она уже содержит правильный путь к массиву тела змейки.
         const snakeBodyArray = `a.${window.bodyArray.split('.')[1]}`;
 
         // Этап 4: Создаем нашу новую, улучшенную функцию и заменяем старую.
@@ -1381,7 +1385,7 @@ window.levelEditorMod.alterSnakeCode = function(code) {
         }`;
 
         code = code.replace(originalSpawnerFunc, newSpawnerFunc);
-        console.log("Логика появления яблок УСПЕШНО изменена (метод v3)!");
+        console.log("Логика появления яблок УСПЕШНО изменена (метод v4)!");
 
       } else {
         console.error("Критическая ошибка: найдена функция роста змейки, но не найдена функция спавна яблок по имени: " + spawnerFuncName);
