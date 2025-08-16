@@ -1320,12 +1320,12 @@ window.levelEditorMod.alterSnakeCode = function(code) {
 
   // --- НАЧАЛО ИСПРАВЛЕНИЙ ДЛЯ РЕСПАВНА ЯБЛОК (v3) ---
   try {
-    // Этап 1: Находим функцию, где змейка растет. Она содержит ".unshift(this..." и ".clone()"
+    // Этап 1: Находим функцию роста змейки. Она содержит ".unshift(this..." и ".clone()", а также вызов функции спавна "... .push(...(this))"
     const growthFuncRegex = /[$a-zA-Z0-9_]{0,8}\.prototype\.[$a-zA-Z0-9_]{0,8}=function\(a\){this\.([$a-zA-Z0-9_]{0,8})\.unshift\(this\.\1\[0\]\.clone\(\)\);.*this\.([$a-zA-Z0-9_]{0,8})\.push\(([$a-zA-Z0-9_]{0,8})\(this\)\)}/;
     const growthFuncMatch = code.match(growthFuncRegex);
 
     if (growthFuncMatch) {
-      // Этап 2: Извлекаем из нее имя функции-спавнера яблок.
+      // Этап 2: Извлекаем из нее имя функции-спавнера яблок (3-я захваченная группа).
       const spawnerFuncName = growthFuncMatch[3];
 
       // Этап 3: Теперь, зная имя, находим полное определение функции-спавнера.
@@ -1335,14 +1335,14 @@ window.levelEditorMod.alterSnakeCode = function(code) {
       if (appleSpawnerMatch) {
         const originalSpawnerFunc = appleSpawnerMatch[1];
         
-        // Извлекаем "динамические" имена из найденного кода
+        // Извлекаем "динамические" имена переменных из найденного кода
         const boardState = originalSpawnerFunc.match(/a\.(.*?)\.width/)[1];
         const isTileFreeCheck = originalSpawnerFunc.match(/while\(!a\.(.*?)\(b,c\)\)/)[1];
         const coordConstructor = originalSpawnerFunc.match(/return new (.*?)\(b,c\)/)[1];
         
         const snakeBodyArray = `a.${window.bodyArray.split('.')[1]}`;
 
-        // Этап 4: Создаем нашу новую функцию и заменяем старую.
+        // Этап 4: Создаем нашу новую, улучшенную функцию и заменяем старую.
         const newSpawnerFunc = `
         ${spawnerFuncName} = function(a) {
           const snakeHead = ${snakeBodyArray}[0];
@@ -1396,7 +1396,6 @@ window.levelEditorMod.alterSnakeCode = function(code) {
 
   return code;
 }
-
 
 
 
