@@ -1413,81 +1413,86 @@ window.levelEditorMod.alterSnakeCode = function(code) {
   const helperFunction = `
   globalThis.MY_MOD_getAppleRespawnPos = function(context, appleIndex, originalPos) {
     // --- НАСТРОЙКИ МОДА ---
-    const INTERVENTION_PROBABILITY = 0.1;
-    const SEARCH_RADIUS = 4;
+    const INTERVENTION_PROBABILITY = 0.5;
+    const FORBIDDEN_RADIUS = 3;
+    const GOLDEN_RADIUS_MAX = 6;
     // ----------------------
-    console.log("call");
-
-    if (Math.random() > INTERVENTION_PROBABILITY) {
-    console.log("imdumb");
-      return originalPos;
-    }
 
     try {
       // --- Получаем необходимые данные из игры ---
       const snakeHead = window.wholeSnakeObject.oa.ka[0];
       const snakeBody = window.wholeSnakeObject.oa.ka;
       const apples = context.ka;
+      // --- ИСПРАВЛЕНИЕ: Используем правильный путь к размерам доски, который вы нашли ---
       const board = window.wholeSnakeObject.ka.oa;
-      // --- НОВАЯ СТРОКА: Получаем карту стен ---
       const wallMap = window.wholeSnakeObject.Ea.oa;
-      console.log(snakeHead, snakeBody, apples, board, wallMap);
 
-      // --- НОВАЯ СТРОКА: Безопасная проверка, включающая карту стен ---
-      if (!snakeHead || !board || !wallMap) return originalPos;
+      // Безопасная проверка с логированием в случае ошибки
+      if (!snakeHead || !board || !wallMap) {
+        console.error('[SNAKE MOD] Критическая ошибка: Не удалось получить доступ к объектам игры (snakeHead, board или wallMap).');
+        return originalPos;
+      }
 
-      const validSpots = [];
-      for (let dx = -SEARCH_RADIUS; dx <= SEARCH_RADIUS; dx++) {
-        for (let dy = -SEARCH_RADIUS; dy <= SEARCH_RADIUS; dy++) {
-          if (dx === 0 && dy === 0) continue;
+      // --- ЛОГИРОВАНИЕ: Начало анализа ---
+      console.log('[SNAKE MOD] Анализ спавна. Игра предлагает: (' + originalPos.x + ',' + originalPos.y + ')');
+
+      // Шаг 1: Проверка вероятности. Сначала решаем, будем ли вообще вмешиваться.
+      if (Math.random() > INTERVENTION_PROBABILITY) {
+        console.log('[SNAKE MOD] Итог: Вмешательство пропущено по вероятности.');
+        return originalPos;
+      }
+
+      const originalDistance = Math.abs(originalPos.x - snakeHead.x) + Math.abs(originalPos.y - snakeHead.y);
+
+      // Шаг 2: Проверка, не является ли предложенная позиция уже "удачной".
+      if (originalDistance <= GOLDEN_RADIUS_MAX) {
+        console.log('[SNAKE MOD] Итог: Вмешательство не требуется. Дистанция (' + originalDistance + ') уже в пределах "Золотой зоны".');
+        return originalPos;
+      }
+
+      // --- ЛОГИРОВАНИЕ: Намерение вмешаться ---
+      console.log('[SNAKE MOD] Вмешиваюсь. Дистанция (' + originalDistance + ') слишком велика. Поиск лучшего места...');
+
+      // Шаг 3: Поиск всех безопасных клеток в "Золотой зоне"
+      const validGoldenSpots = [];
+      for (let dx = -GOLDEN_RADIUS_MAX; dx <= GOLDEN_RADIUS_MAX; dx++) {
+        for (let dy = -GOLDEN_RADIUS_MAX; dy <= GOLDEN_RADIUS_MAX; dy++) {
+          const distance = Math.abs(dx) + Math.abs(dy);
+
+          if (distance <= FORBIDDEN_RADIUS || distance > GOLDEN_RADIUS_MAX) continue;
 
           const newX = snakeHead.x + dx;
           const newY = snakeHead.y + dy;
 
-          // Проверка 1: Клетка в пределах карты?
-          if (newX < 0 || newX >= board.width || newY < 0 || newY >= board.height) {
-            continue;
-          }
+          if (newX < 0 || newX >= board.width || newY < 0 || newY >= board.height) continue;
+          if (wallMap[newY] !== undefined && wallMap[newY][newX] > 0) continue;
+          if (snakeBody.some(segment => segment.x === newX && segment.y === newY)) continue;
+          if (apples.some((apple, index) => index !== appleIndex && apple.pos.x === newX && apple.pos.y === newY)) continue;
 
-          // --- НОВЫЙ БЛОК: Проверка 4 (ставим её раньше для эффективности) ---
-          // Проверяем, что клетка не является стеной. Любое значение > 0 считается стеной.
-          // wallMap[newY] !== undefined - защита от ошибок, если карта стен неполная
-          if (wallMap[newY] !== undefined && wallMap[newY][newX] > 0) {
-            continue;
-          }
-          // --- КОНЕЦ НОВОГО БЛОКА ---
-
-          // Проверка 2: Клетка занята телом змейки?
-          const isSnakeOnSpot = snakeBody.some(segment => segment.x === newX && segment.y === newY);
-          if (isSnakeOnSpot) {
-            continue;
-          }
-
-          // Проверка 3: Клетка занята другим яблоком?
-          const isAppleOnSpot = apples.some((apple, index) => index !== appleIndex && apple.pos.x === newX && apple.pos.y === newY);
-          if (isAppleOnSpot) {
-            continue;
-          }
-
-          validSpots.push({x: newX, y: newY});
+          validGoldenSpots.push({x: newX, y: newY});
         }
       }
 
-      if (validSpots.length > 0) {
-        const randomIndex = Math.floor(Math.random() * validSpots.length);
-        const luckySpot = validSpots[randomIndex];
+      // Шаг 4: Принятие решения на основе найденных клеток
+      if (validGoldenSpots.length > 0) {
+        const randomIndex = Math.floor(Math.random() * validGoldenSpots.length);
+        const luckySpot = validGoldenSpots[randomIndex];
         
+        // --- ЛОГИРОВАНИЕ: Успешное вмешательство ---
+        console.info('[SNAKE MOD] Итог: Найдено ' + validGoldenSpots.length + ' подходящих мест. Яблоко перемещено в (' + luckySpot.x + ',' + luckySpot.y + ').');
+
         originalPos.x = luckySpot.x;
         originalPos.y = luckySpot.y;
-        console.log(validSpots);
-        return originalPos;
       } else {
-      console.log(originalPos);
-        return originalPos;
+        // --- ЛОГИРОВАНИЕ: Неудачное вмешательство ---
+        console.warn('[SNAKE MOD] Итог: Вмешательство не удалось. Не найдено безопасных мест в "Золотой зоне". Используется позиция игры.');
       }
+      
+      return originalPos;
 
     } catch (e) {
-    console.log(e);
+      // --- ЛОГИРОВАНИЕ: Ошибки в коде ---
+      console.error('[SNAKE MOD] Произошла ошибка во время выполнения логики:', e);
       return originalPos;
     }
   };
