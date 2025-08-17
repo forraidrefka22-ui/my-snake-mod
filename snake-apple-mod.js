@@ -1407,8 +1407,9 @@ window.levelEditorMod.alterSnakeCode = function(code) {
     }
   }
   `,false);
-  // --- ШАГ 1: ДОБАВЛЯЕМ НАШУ ЛОГИКУ КАК ОТДЕЛЬНУЮ ГЛОБАЛЬНУЮ ФУНКЦИЮ ---
-  // Этот код будет безопасно добавлен в конец всего скрипта игры.
+   // --- НАШ КОД, ИСПОЛЬЗУЮЩИЙ РАБОЧИЙ ПАТТЕРН МОДА ---
+
+  // Шаг 1: Добавляем нашу вспомогательную функцию в глобальную область видимости
   const helperFunction = `
     globalThis.MY_MOD_getAppleRespawnPos = function(context, appleIndex, originalPos) {
       try {
@@ -1417,16 +1418,13 @@ window.levelEditorMod.alterSnakeCode = function(code) {
           let offset = 1;
           let newX, newY;
           let isOccupied = true;
-          
           while(isOccupied) {
             isOccupied = false;
             newX = snakeHead.x + offset;
             newY = snakeHead.y;
             for(let i = 0; i < context.ka.length; i++) {
               if (i !== appleIndex && context.ka[i].pos.x === newX && context.ka[i].pos.y === newY) {
-                isOccupied = true;
-                offset++;
-                break;
+                isOccupied = true; offset++; break;
               }
             }
           }
@@ -1439,19 +1437,24 @@ window.levelEditorMod.alterSnakeCode = function(code) {
   `;
   code = appendCodeWithinSnakeModule(code, helperFunction, false);
 
-  // --- ШАГ 2: ВНЕДРЯЕМ ОДНУ СТРОКУ - ВЫЗОВ НАШЕЙ ФУНКЦИИ ---
-  // Находим функцию респавна по её началу
-  const respawnFuncSignature = /(function\([a-z],[a-z],[a-z]\){)/;
-  // Это единственная строка, которую мы вставим. Она вызывает нашу функцию и перезаписывает переменную `c`
-  const injectionCall = 'c=globalThis.MY_MOD_getAppleRespawnPos(a,b,c);';
-  
-  if(code.match(respawnFuncSignature)) {
-    code = code.replace(respawnFuncSignature, `$1 ${injectionCall}`);
-    console.log('[SNAKE MOD] Функция респавна яблок успешно изменена (v3).');
-  } else {
-    console.error('[SNAKE MOD] Не удалось найти функцию респавна яблок для модификации (v3).');
-  }
+  // Шаг 2: Находим текст функции респавна, используя хелпер мода
+  let respawnFunc, respawnFuncOrig;
+  // Ищем функцию, которая принимает 3 аргумента и содержит уникальный код
+  respawnFunc = respawnFuncOrig = findFunctionInCode(code,
+    /[$a-zA-Z0-9_]{0,6}=function\([a-z],[a-z],[a-z]\)/, // Начало функции
+    /YS\(a.settings,15\)&&\(a.ka\[b\]\.Z0=hpl\(a,c\)\)/, // Уникальная строка внутри
+    false
+  );
 
+  // Шаг 3: Внедряем вызов нашей функции в текст
+  const injectionCall = 'c=globalThis.MY_MOD_getAppleRespawnPos(a,b,c);';
+  respawnFunc = assertReplace(respawnFunc, '{', `{${injectionCall}}`);
+
+  // Шаг 4: Заменяем старый текст функции на новый в общем коде
+  code = code.replace(respawnFuncOrig, respawnFunc);
+  
+  console.log('[SNAKE MOD] Функция респавна яблок успешно изменена по паттерну мода.');
+  
   // --- КОНЕЦ НАШИХ ИЗМЕНЕНИЙ ---
 
   return code;
