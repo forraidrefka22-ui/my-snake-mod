@@ -1171,29 +1171,7 @@ window.levelEditorMod.alterSnakeCode = function(code) {
   funcWithResetState = assertReplace(funcWithResetState, '{', '{globalThis.megaWholeSnakeObject = this;');
   code = code.replace(funcWithResetStateOrig, funcWithResetState);
 
-  // --- ШАГ 1: ДОБАВЛЯЕМ НАШУ ЛОГИКУ КАК ОТДЕЛЬНУЮ ГЛОБАЛЬНУЮ ФУНКЦИЮ ---
-  // Этот код будет безопасно добавлен в конец всего скрипта игры.
-  const helperFunction = `
-    globalThis.MY_MOD_getAppleRespawnPos = function(context, appleIndex, originalPos) {
-      return true;
-    };
-  `;
-  code = appendCodeWithinSnakeModule(code, helperFunction, false);
 
-  // --- ШАГ 2: ВНЕДРЯЕМ ОДНУ СТРОКУ - ВЫЗОВ НАШЕЙ ФУНКЦИИ ---
-  // Находим функцию респавна по её началу
-  const respawnFuncSignature = /(function\([a-z],[a-z],[a-z]\){)/;
-  // Это единственная строка, которую мы вставим. Она вызывает нашу функцию и перезаписывает переменную `c`
-  const injectionCall = 'c=globalThis.MY_MOD_getAppleRespawnPos(a,b,c);';
-  
-  if(code.match(respawnFuncSignature)) {
-    code = code.replace(respawnFuncSignature, `$1 ${injectionCall}`);
-    console.log('[SNAKE MOD] Функция респавна яблок успешно изменена (v3).');
-  } else {
-    console.error('[SNAKE MOD] Не удалось найти функцию респавна яблок для модификации (v3).');
-  }
-
-  // --- КОНЕЦ НАШИХ ИЗМЕНЕНИЙ ---
 
   // Остальной код из мода остается без изменений
   (0,eval)(`
