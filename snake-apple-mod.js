@@ -1175,30 +1175,7 @@ window.levelEditorMod.alterSnakeCode = function(code) {
   // Этот код будет безопасно добавлен в конец всего скрипта игры.
   const helperFunction = `
     globalThis.MY_MOD_getAppleRespawnPos = function(context, appleIndex, originalPos) {
-      try {
-        const snakeHead = window.wholeSnakeObject.oa.ka[0];
-        if (snakeHead) {
-          let offset = 1;
-          let newX, newY;
-          let isOccupied = true;
-          
-          while(isOccupied) {
-            isOccupied = false;
-            newX = snakeHead.x + offset;
-            newY = snakeHead.y;
-            for(let i = 0; i < context.ka.length; i++) {
-              if (i !== appleIndex && context.ka[i].pos.x === newX && context.ka[i].pos.y === newY) {
-                isOccupied = true;
-                offset++;
-                break;
-              }
-            }
-          }
-          originalPos.x = newX;
-          originalPos.y = newY;
-        }
-      } catch(e) {}
-      return originalPos;
+      return true;
     };
   `;
   code = appendCodeWithinSnakeModule(code, helperFunction, false);
