@@ -1413,7 +1413,7 @@ window.levelEditorMod.alterSnakeCode = function(code) {
   const helperFunction = `
   globalThis.MY_MOD_getAppleRespawnPos = function(context, appleIndex, originalPos) {
     // --- НАСТРОЙКИ МОДА ---
-    const INTERVENTION_PROBABILITY = 0.5;
+    const INTERVENTION_PROBABILITY = 0.1;
     const FORBIDDEN_RADIUS = 3;
     const GOLDEN_RADIUS_MAX = 6;
     // ----------------------
