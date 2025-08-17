@@ -1204,7 +1204,7 @@ window.levelEditorMod.alterSnakeCode = function(code) {
               }
             }
           }
-          // Главное: меняем оригинальные координаты `c` на наши
+          // Главное: меняем оригинальные координаты на наши
           c.x = newX;
           c.y = newY;
         }
@@ -1248,6 +1248,22 @@ window.levelEditorMod.alterSnakeCode = function(code) {
   // Обязательно возвращаем измененный код в конце
   return code;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ////////////////////////////////////////////////////////////////////
 //RUNCODEAFTER
