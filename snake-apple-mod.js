@@ -1470,7 +1470,6 @@ const helperFunction = `
       
       const wallMap = globalThis.MY_MOD_createCorrectedWallMap(rawWallMap, board);
 
-      // --- НОВЫЙ БЛОК: ОДНОКРАТНЫЙ ВЫВОД КАРТЫ В КОНСОЛЬ ---
       if (!window.MY_MOD_mapLogged) {
         console.log("=====================================================");
         console.log("[SNAKE MOD] Исправленная карта стен (выводится 1 раз):");
@@ -1483,20 +1482,18 @@ const helperFunction = `
 
       if (forwardPath.length < FORBIDDEN_PATH_DISTANCE + 1) return originalPos;
       
-      // --- НОВЫЙ БЛОК: ЛОГИРОВАНИЕ ДИСТАНЦИИ ---
-      // Ищем позицию, предложенную игрой, на нашем пути
       const originalPathIndex = forwardPath.findIndex(p => p.x === originalPos.x && p.y === originalPos.y);
       const originalPathDistance = originalPathIndex !== -1 ? originalPathIndex + 1 : -1;
 
+      // --- ИСПРАВЛЕННЫЙ БЛОК ЛОГИРОВАНИЯ ---
       if(originalPathDistance !== -1) {
-          // Если игра предложила место на пути, проверяем, достаточно ли оно хорошо
-          console.log(\`[SNAKE MOD] Анализ: Игра предлагает яблоко на пути, дистанция: \${originalPathDistance} шагов.\`);
+          console.log('[SNAKE MOD] Анализ: Игра предлагает яблоко на пути, дистанция: ' + originalPathDistance + ' шагов.');
           if (originalPathDistance <= GOLDEN_PATH_DISTANCE_MAX) {
-              console.log(\`[SNAKE MOD] Итог: Вмешательство не требуется, позиция уже в "Золотой зоне".\`);
+              console.log('[SNAKE MOD] Итог: Вмешательство не требуется, позиция уже в "Золотой зоне".');
               return originalPos;
           }
       } else {
-          console.log(\`[SNAKE MOD] Анализ: Игра предлагает яблоко НЕ на пути (${originalPos.x},${originalPos.y}).\`);
+          console.log('[SNAKE MOD] Анализ: Игра предлагает яблоко НЕ на пути (' + originalPos.x + ',' + originalPos.y + ').');
       }
       
       console.log('[SNAKE MOD] Вмешиваюсь. Поиск лучшего места на пути...');
@@ -1509,10 +1506,9 @@ const helperFunction = `
       if (validGoldenSpots.length > 0) {
         const randomIndex = Math.floor(Math.random() * validGoldenSpots.length);
         const luckySpot = validGoldenSpots[randomIndex];
-        // --- НОВЫЙ БЛОК: ЛОГИРОВАНИЕ ДИСТАНЦИИ ДЛЯ НОВОГО ЯБЛОКА ---
         const newPathDistance = forwardPath.findIndex(p => p.x === luckySpot.x && p.y === luckySpot.y) + 1;
         
-        console.info(\`[SNAKE MOD] Итог: Найдено \${validGoldenSpots.length} мест. Яблоко перемещено в (${luckySpot.x},${luckySpot.y}), дистанция: \${newPathDistance} шагов.\`);
+        console.info('[SNAKE MOD] Итог: Найдено ' + validGoldenSpots.length + ' мест. Яблоко перемещено в (' + luckySpot.x + ',' + luckySpot.y + '), дистанция: ' + newPathDistance + ' шагов.');
 
         originalPos.x = luckySpot.x;
         originalPos.y = luckySpot.y;
@@ -1522,7 +1518,7 @@ const helperFunction = `
       
       return originalPos;
     } catch (e) {
-      console.error('[SNAKE MOD] Произошла ошибка в Pathfinding-логике (vLogger):', e);
+      console.error('[SNAKE MOD] Произошла ошибка в Pathfinding-логике (vSafeLogger):', e);
       return originalPos;
     }
   };
