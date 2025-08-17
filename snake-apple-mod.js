@@ -1476,13 +1476,14 @@ window.levelEditorMod.alterSnakeCode = function(code) {
         
         originalPos.x = luckySpot.x;
         originalPos.y = luckySpot.y;
-        
+        console.log(originalPos);
         return originalPos;
       } else {
         return originalPos;
       }
 
     } catch (e) {
+    console.log(e);
       return originalPos;
     }
   };
