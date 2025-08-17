@@ -1418,6 +1418,7 @@ window.levelEditorMod.alterSnakeCode = function(code) {
     // ----------------------
 
     if (Math.random() > INTERVENTION_PROBABILITY) {
+    console.log("imdumb");
       return originalPos;
     }
 
@@ -1476,9 +1477,10 @@ window.levelEditorMod.alterSnakeCode = function(code) {
         
         originalPos.x = luckySpot.x;
         originalPos.y = luckySpot.y;
-        console.log(originalPos);
+        console.log(validSpots);
         return originalPos;
       } else {
+      console.log(originalPos);
         return originalPos;
       }
 
