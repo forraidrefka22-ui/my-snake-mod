@@ -1452,7 +1452,7 @@ const helperFunction = `
 
   globalThis.MY_MOD_getAppleRespawnPos = function(context, appleIndex, originalPos) {
     // --- НАСТРОЙКИ МОДА ---
-    const INTERVENTION_PROBABILITY = 0.6;
+    const INTERVENTION_PROBABILITY = 0.25;
     const FORBIDDEN_PATH_DISTANCE = 2;
     const GOLDEN_PATH_DISTANCE_MAX = 15;
     // ----------------------
