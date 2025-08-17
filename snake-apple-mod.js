@@ -1150,7 +1150,7 @@ window.levelEditorMod.runCodeBefore = function() {
 ////////////////////////////////////////////////////////////////////
 
 window.levelEditorMod.alterSnakeCode = function(code) {
-  // Эта часть оставлена без изменений, чтобы другие моды работали
+  // --- НАЧАЛО ОРИГИНАЛЬНОГО КОДА МОДА (ОСТАВЛЯЕМ БЕЗ ИЗМЕНЕНИЙ) ---
   code = code.replaceAll(/\$\$/gm, `aaaa`);
   globalThis.tileWidth = code.assertMatch(/[a-z]\.[$a-zA-Z0-9_]{0,8}\.fillRect\([a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,8}\.([$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}),[a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8},[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8},[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\)/)[1];
   [,globalThis.applePosProperty, globalThis.appleSpeedProperty] = code.assertMatch(/&&\([$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.x&&\([$a-zA-Z0-9_]{0,8}\.([$a-zA-Z0-9_]{0,8})\.x\+=[$a-zA-Z0-9_]{0,8}\.([$a-zA-Z0-9_]{0,8})\.x\),/);
@@ -1171,58 +1171,6 @@ window.levelEditorMod.alterSnakeCode = function(code) {
   funcWithResetState = assertReplace(funcWithResetState, '{', '{globalThis.megaWholeSnakeObject = this;');
   code = code.replace(funcWithResetStateOrig, funcWithResetState);
 
-  
-  // --- НАЧАЛО НОВОГО БЛОКА ДЛЯ ПЕРЕХВАТА РЕСПАВНА ЯБЛОК ---
-  // Этот блок нужно было добавить.
-  
-  // 1. Находим функцию респавна (`mpl`) по её содержимому. 
-  // Это надежнее, чем искать по имени, которое может измениться.
-  // Мы ищем: function(a,b,c){... a.ka[b].pos=c; ...}
-  const respawnFuncSignature = /(function\([a-z],[a-z],[a-z]\){a\.ka\[[a-z]\]\.pos=[a-z];)/;
-
-  if (code.match(respawnFuncSignature)) {
-    // 2. Это наш код, который мы "вживим" в начало функции.
-    // Он будет менять координаты в переменной `c` до того, как их использует остальной код функции.
-    const injectionCode = `
-      try {
-        if (window.wholeSnakeObject) {
-          const snakeHead = window.wholeSnakeObject.oa.ka[0];
-          let offset = 1;
-          let newX = snakeHead.x + offset;
-          let newY = snakeHead.y;
-          let isOccupied = true;
-          
-          // Цикл, чтобы яблоки не появлялись друг на друге, если съесть несколько сразу
-          while(isOccupied) {
-            isOccupied = false;
-            newX = snakeHead.x + offset;
-            for(let i = 0; i < a.ka.length; i++) {
-              if (i !== b && a.ka[i].pos.x === newX && a.ka[i].pos.y === newY) {
-                isOccupied = true;
-                offset++;
-                break;
-              }
-            }
-          }
-          // Главное: меняем оригинальные координаты на наши
-          c.x = newX;
-          c.y = newY;
-        }
-      } catch(e) {}
-    `;
-
-    // 3. Вставляем наш код сразу после первой открывающей скобки `{` в найденной функции.
-    // "$1" - это найденная часть (сигнатура функции), после которой мы вставляем наш код.
-    code = code.replace(respawnFuncSignature, `$1 ${injectionCode.replace(/\s+/g, ' ')}`);
-    console.log('[SNAKE MOD] Функция респавна яблок успешно изменена.');
-  } else {
-    console.error('[SNAKE MOD] Не удалось найти функцию респавна яблок для модификации.');
-  }
-
-  // --- КОНЕЦ НОВОГО БЛОКА ---
-
-
-  // Остальной код из мода остается без изменений
   (0,eval)(`
   function emptyApples() {
     window.wholeSnakeObject.${appleArrayHolderOfWholeSnakeObject}.${appleArray}.length = 0;
@@ -1244,8 +1192,42 @@ window.levelEditorMod.alterSnakeCode = function(code) {
 
   let wallDetailsContainer = code.assertMatch(/[$a-zA-Z0-9_]{0,8}&&\([$a-zA-Z0-9_]{0,8}\(this\.([$a-zA-Z0-9_]{0,8}),\n?[$a-zA-Z0-9_]{0,8}\),\n?[$a-zA-Z0-9_]{0,8}\(this\.[$a-zA-Z0-9_]{0,8},7\)/)[1];
   let [,placeWallFunc,wallCoordProperty,otherProperty1,fakeWallProperty,otherProperty2] = code.assertMatch(/([$a-zA-Z0-9_]{0,8})\(this,[a-z],{([$a-zA-Z0-9_]{0,8}):[a-z],([$a-zA-Z0-9_]{0,8}:!1,[$a-zA-Z0-9_]{0,8}:-1),([$a-zA-Z0-9_]{0,8}):!0,([$a-zA-Z0-9_]{0,8}:!0,[$a-zA-Z0-9_]{0,8}:void 0)}\)/);
+  // --- КОНЕЦ ОРИГИНАЛЬНОГО КОДА МОДА ---
 
-  // Обязательно возвращаем измененный код в конце
+
+  // --- НАШ БЛОК, ПЕРЕМЕЩЕННЫЙ В КОНЕЦ ФУНКЦИИ ---
+  const respawnFuncSignature = /(function\([a-z],[a-z],[a-z]\){a\.ka\[[a-z]\]\.pos=[a-z];)/;
+  if (code.match(respawnFuncSignature)) {
+    const injectionCode = `
+      try {
+        if (window.wholeSnakeObject) {
+          const snakeHead = window.wholeSnakeObject.oa.ka[0];
+          let offset = 1;
+          let newX = snakeHead.x + offset;
+          let newY = snakeHead.y;
+          let isOccupied = true;
+          while(isOccupied) {
+            isOccupied = false;
+            newX = snakeHead.x + offset;
+            for(let i = 0; i < a.ka.length; i++) {
+              if (i !== b && a.ka[i].pos.x === newX && a.ka[i].pos.y === newY) {
+                isOccupied = true;
+                offset++;
+                break;
+              }
+            }
+          }
+          c.x = newX; c.y = newY;
+        }
+      } catch(e) {}
+    `;
+    code = code.replace(respawnFuncSignature, `$1 ${injectionCode.replace(/\s+/g, ' ')}`);
+    console.log('[SNAKE MOD] Функция респавна яблок успешно изменена (v2).');
+  } else {
+    console.error('[SNAKE MOD] Не удалось найти функцию респавна яблок для модификации (v2).');
+  }
+  // --- КОНЕЦ НАШЕГО БЛОКА ---
+
   return code;
 }
 
