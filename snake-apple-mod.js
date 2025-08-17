@@ -5,757 +5,705 @@ window.levelEditorMod = {};
 ////////////////////////////////////////////////////////////////////
 
 window.levelEditorMod.runCodeBefore = function() {
+  ///////////////////////////////////////
+  //Taken from shared.js
+  ///////////////////////////////////////
 
-//### НАЧАЛО ИЗМЕНЕНИЙ ###
-// Вспомогательная функция для поиска позиции рядом со змейкой
-window.levelEditorMod.getAppleSpawnPosition = function(snake, board) {
-    // Шанс 80% на появление рядом с головой
-    const PROB_SPAWN_NEAR = 0.8;
-    if (Math.random() > PROB_SPAWN_NEAR || !snake || snake.length === 0) {
-        return null; // Используем стандартную логику
-    }
+  window.wholeSnakeObject;//Set to the big snake object that includes everything in snake.
+  window.megaWholeSnakeObject;//Contains wholeSnakeObject
 
-    const head = snake[0];
-    const searchRadius = 4; // Радиус поиска 4 клетки вокруг головы
-    const validSpots = [];
-
-    const occupied = new Set();
-    for (const part of snake) {
-        occupied.add(part.x + ',' + part.y);
-    }
-
-    for (let dx = -searchRadius; dx <= searchRadius; dx++) {
-        for (let dy = -searchRadius; dy <= searchRadius; dy++) {
-            const x = head.x + dx;
-            const y = head.y + dy;
-
-            // Проверка, что клетка находится в пределах поля
-            if (x >= 0 && x < board.width && y >= 0 && y < board.height) {
-                // Проверка, что клетка не занята змейкой
-                if (!occupied.has(x + ',' + y)) {
-                    // В идеале здесь также нужна проверка на стены, но для простоты мы ее опускаем.
-                    // Логика и так не даст яблоку появиться в стене, если используется режим "Стены".
-                    validSpots.push({x: x, y: y});
-                }
-            }
+  //Allow running code at particular points in time (e.g. after board reset, after death, after eating an apple)
+  window.simpleHookManager = {
+    hooks: {
+      'afterResetBoard':[],//Format for an element {name: myHook, callback: myFunction}
+    },
+    runHook: function(hookType) {
+      if(this.hooks.hasOwnProperty(hookType) && Array.isArray(this.hooks[hookType])) {
+        for(let hook of this.hooks[hookType]) {
+          hook.callback();
         }
-    }
-
-    if (validSpots.length > 0) {
-        // Возвращаем случайную свободную позицию рядом с головой
-        return validSpots[Math.floor(Math.random() * validSpots.length)];
-    }
-
-    return null; // Если не нашли места, используем стандартную логику
-};
-//### КОНЕЦ ИЗМЕНЕНИЙ ###
-
-
-///////////////////////////////////////
-//Taken from shared.js
-///////////////////////////////////////
-
-window.wholeSnakeObject;//Set to the big snake object that includes everything in snake.
-window.megaWholeSnakeObject;//Contains wholeSnakeObject
-
-//Allow running code at particular points in time (e.g. after board reset, after death, after eating an apple)
-window.simpleHookManager = {
-hooks: {
-'afterResetBoard':[],//Format for an element {name: myHook, callback: myFunction}
-},
-runHook: function(hookType) {
-if(this.hooks.hasOwnProperty(hookType) && Array.isArray(this.hooks[hookType])) {
-for(let hook of this.hooks[hookType]) {
-hook.callback();
-}
-} else {
-throw new Error(`Hook type "${hookType}" not found`);
-}
-},
-registerHook: function(hookType, hookName, hookCallback) {
-if(!this.hooks.hasOwnProperty(hookType) || !Array.isArray(this.hooks[hookType])) throw new Error('Hook type not found');
-
-if(typeof hookName !== 'string' || typeof hookCallback !== 'function') {
-    throw new Error('hookName must be a string, hookCallback must be a function.');
-  }
-
-  //Check hook not already registered
-  if(this.hooks[hookType].some(el=>el.name === hookName)) return;
-
-  this.hooks[hookType].push({name: hookName, callback: hookCallback});
-}
-
-}
-
-///////////////////////////////////////
-//Taken from level-editor.js
-///////////////////////////////////////
-
-//For localhost vs github version
-
-const isProd = true;
-
-globalThis.rootUrl;
-globalThis.imagePresetsFolder;
-globalThis.sharedUrl;
-globalThis.randomHamUrl;
-globalThis.challengeUrl;
-
-if(isProd) {
-//Live
-globalThis.rootUrl = 'https://raw.githubusercontent.com/DarkSnakeGang/GoogleSnakeLevelEditor/main/';
-globalThis.imagePresetsFolder = 'image-presets/';
-globalThis.sharedUrl = 'https://raw.githubusercontent.com/DarkSnakeGang/GoogleSnakeLevelEditor/main/shared.js';
-globalThis.randomHamUrl = 'https://raw.githubusercontent.com/DarkSnakeGang/GoogleSnakeLevelEditor/main/random_ham.txt';
-globalThis.challengeUrl = 'https://raw.githubusercontent.com/DarkSnakeGang/GoogleSnakeLevelEditor/main/challenge.txt';
-} else {
-//Dev
-globalThis.rootUrl = 'http://localhost:3000/';
-globalThis.imagePresetsFolder = 'presets-windows-symlink/';
-globalThis.sharedUrl = 'https://raw.githubusercontent.com/DarkSnakeGang/GoogleSnakeLevelEditor/main/shared.js';
-globalThis.randomHamUrl = 'http://localhost:3000/random_ham.txt';
-globalThis.challengeUrl = 'http://localhost:3000/challenge.txt';
-}
-
-//Used by make pattern
-globalThis.roundApplePos = true;//For placing apples with mousedown
-globalThis.mousePlaceMode = {category: 'apple', type:0};//Category could be apple, wall, drag or box, type corresponds to which apple
-globalThis.disableWallMode = true;//Whether wall mode should place walls every 2 turns
-globalThis.disableAppleInitialSpeed = false;
-globalThis.customSnakeStart = {isActive:false, x:4, y:1};
-globalThis.hasShownWarnings = {wall: false, sokoban: false};//Whether we have shown the warning about walls/boxes not having collisions without the right mode selected.
-globalThis.customPresetManager = {
-canvasWidth:370,
-canvasHeight:340,
-currentMapSize:'standard',
-currentBoardWidth:17,
-currentBoardHeight:15,
-brush:'apple',
-pixelList:[{x: 11, y: 7, category: 'apple', type: 0}],
-isDrawing:false,
-isErasing:false,
-lastSpotDrawnOn:{x:undefined,y:undefined},
-changeMapSize: function(newSize) {
-let newSizeSetting = null;
-this.currentMapSize = newSize;
-switch(newSize) {
-case 'small':
-this.currentBoardWidth = 10;
-this.currentBoardHeight = 9;
-newSizeSetting = 1;
-break;
-case 'standard':
-this.currentBoardWidth = 17;
-this.currentBoardHeight = 15;
-newSizeSetting = 0;
-break;
-case 'large':
-this.currentBoardWidth = 24;
-this.currentBoardHeight = 21;
-newSizeSetting = 2;
-break;
-default:
-throw new Error(`Unrecognised map size! Found ${newSize}`);
-}
-
-//Clear out old map (and triggers a draw afterwards)
-  this.clearAll();
-  this.placeInitialApple();
-  this.draw();//Technically we draw twice in a row since clearAll also draws, but ¯\_(ツ)_/¯
-
-  //Also change real map size
-  selectNewSizeSettingAndHardReset(newSizeSetting);
-},
-draw: function() {
-  const tileWidth = this.canvasWidth/this.currentBoardWidth;
-  const tileHeight = this.canvasHeight/this.currentBoardHeight;
-
-  this.ctx.fillStyle = "#a2d149";
-  this.ctx.fillRect(0,0,this.canvasWidth,this.canvasHeight);
-
-  this.ctx.fillStyle = "#aad751";
-  for(let j = 0; j < this.currentBoardHeight; j++) {
-    for(let i = 0; i < this.currentBoardWidth; i++) {
-      if((i + j) % 2 === 0) {
-        this.ctx.fillRect(i*tileWidth, j*tileHeight, tileWidth, tileHeight);
-      }
-    }
-  }
-
-  for(let k of this.pixelList) {
-    this.drawEntity(k.x * tileWidth, k.y * tileHeight, tileWidth, tileHeight, k.category, k.type);
-  }
-},
-drawEntity: function(xCoord, yCoord, width, height, category, type) {
-  switch(category) {
-    case 'apple':
-      this.ctx.fillStyle = "#E05826";
-      this.ctx.fillRect(xCoord, yCoord, width, height);
-      break;
-    case 'wall':
-      this.ctx.fillStyle = "#578A34";
-      this.ctx.fillRect(xCoord, yCoord, width, height);
-      break;
-    case 'box':
-      this.ctx.fillStyle = "#F0A036";
-      this.ctx.fillRect(xCoord, yCoord, width, height);
-      break;
-    case 'snakehead':
-      this.ctx.fillStyle = "#4673E8";
-      this.ctx.fillRect(xCoord, yCoord, width, height);
-      break;
-    default:
-      throw new Error(`Unexpected item to draw on custom preset canvas. Received: ${category}`);
-  }
-},
-clearAll: function() {
-  this.pixelList = [];
-  this.draw();
-},
-handleMouseDownOnBoard: function(event) {
-  event.preventDefault();
-
-  if(event.button === 0) {
-    customPresetManager.isDrawing = true;
-  } else if(event.button === 2) {
-    customPresetManager.isErasing = true;
-  } else {
-    return;
-  }
-
-  const rect = document.getElementById('custom-preset-canvas').getBoundingClientRect();
-
-  customPresetManager.attemptPlace(event.clientX - rect.left, event.clientY - rect.top, customPresetManager.isErasing);
-},
-handleMouseUpAnywhere: function(event) {
-  event.preventDefault();
-
-  if(event.button === 0) {
-    customPresetManager.isDrawing = false;
-  } else if(event.button === 2) {
-    customPresetManager.isErasing = false;
-  } else {
-    return;
-  }
-
-  customPresetManager.lastSpotDrawnOn = {x:undefined,y:undefined};
-},
-handleMouseMoveOnBoard: function(event) {
-  if(!customPresetManager.isDrawing && !customPresetManager.isErasing) return;
-
-  const rect = document.getElementById('custom-preset-canvas').getBoundingClientRect();
-  customPresetManager.attemptPlace(event.clientX - rect.left, event.clientY - rect.top, customPresetManager.isErasing);
-},
-attemptPlace: function(xPixelCoord, yPixelCoord, isErase=false) {
-  //Try to place entity corresponding to current brush into the pixelList.
-  
-  //Convert pixels coords into board coords
-  const tileWidth = this.canvasWidth/this.currentBoardWidth;
-  const tileHeight = this.canvasHeight/this.currentBoardHeight;
-  const boardXCoord = Math.floor(xPixelCoord/tileWidth);
-  const boardYCoord = Math.floor(yPixelCoord/tileHeight);
-
-  //Exit early if the mouse is still on the same square
-  if(this.lastSpotDrawnOn.x === boardXCoord && this.lastSpotDrawnOn.y === boardYCoord) return;
-  this.lastSpotDrawnOn = {x:boardXCoord, y:boardYCoord};
-
-  //Exit early if out of bounds
-  if(boardXCoord < 0 || boardYCoord < 0 || boardXCoord >= this.currentBoardWidth || boardYCoord >= this.currentBoardHeight) return;
-
-  this.removeAtCoord(boardXCoord, boardYCoord); 
-
-  //If we're erasing then exit just after erasing
-  if(isErase) {
-    this.draw();
-    return;
-  }
-
-  switch(this.brush) {
-    case 'apple':
-      this.pixelList.push({ x: boardXCoord, y: boardYCoord, category: 'apple', type: 0});
-      break;
-    case 'wall':
-      this.pixelList.push({ x: boardXCoord, y: boardYCoord, category: 'wall', type: -1});
-      break;
-    case 'box':
-      this.pixelList.push({ x: boardXCoord, y: boardYCoord, category: 'box', type: -1});
-      break;
-    case 'snakehead':
-      //Also remove any other snakehead instances.
-      this.removeSnakeHeads();
-      this.pixelList.push({ x: boardXCoord, y: boardYCoord, category: 'snakehead', type: -1});
-      break;
-    case 'erase':
-      //Do nothing since we remove earlier
-      break;
-    default:
-      throw new Error(`Unrecognised brush type ${this.brush}`);
-  }
-
-  //Always redraw (this might be unecessary if we're placing on an occupied spot, but there's no real harm in this)
-  this.draw();
-},
-removeAtCoord: function(boardX, boardY) {
-  let i = this.pixelList.length;
-  while(i--) {
-    if(this.pixelList[i].x === boardX && this.pixelList[i].y === boardY) {
-      this.pixelList.splice(i, 1);
-    }
-  }
-},
-removeSnakeHeads: function() {
-  let i = this.pixelList.length;
-  while(i--) {
-    if(this.pixelList[i].category === 'snakehead') {
-      this.pixelList.splice(i, 1);
-    }
-  }
-},
-placeInitialApple: function() {
-  //Places a single apple. This is because otherwise the game will be an instant-win
-  this.pixelList.push({x: Math.floor(this.currentBoardWidth * 3/4), y: Math.floor(this.currentBoardHeight/2), category: 'apple', type: 0});
-},
-getExportCode: function() {
-  let codesArray = [];
-
-  //First part gives the map size.
-  codesArray.push(`${this.currentBoardWidth}x${this.currentBoardHeight}`);
-
-  for(let entity of this.pixelList) {
-    switch(entity.category) {
-      case 'apple':
-        codesArray.push(`A${entity.x},${entity.y}`);
-        break;
-      case 'wall':
-        codesArray.push(`W${entity.x},${entity.y}`);
-        break;
-      case 'box':
-        codesArray.push(`B${entity.x},${entity.y}`);
-        break;
-      case 'snakehead':
-        codesArray.push(`S${entity.x},${entity.y}`);
-        break;
-      case 'default':
-        throw new Error('Unrecognise category when getting export code');
-    }
-  }
-
-  return codesArray.join(' ');
-},
-importCode: function(fullCode) {
-  fullCode = fullCode.trim();
-
-  //Process the main part of the code.
-  this.pixelList = this.getPixelListFromLevelCode(fullCode);
-
-  //First part gives map size
-  try {
-    let mapPart = fullCode.split(' ')[0]
-    let [boardWidth, boardHeight] = mapPart.split('x');
-
-    boardWidth = parseInt(boardWidth);
-    boardHeight = parseInt(boardHeight);
-
-    if(typeof boardWidth === 'number' && typeof boardHeight === 'number' && isFinite(boardWidth) && isFinite(boardHeight) && boardWidth > 0 && boardHeight > 0) {
-      this.currentBoardWidth = boardWidth;
-      this.currentBoardHeight = boardHeight;
-
-      let newSizeSetting = null;
-
-      if(boardWidth === 10 && boardHeight === 9) {
-        this.currentMapSize = 'small';
-        newSizeSetting = 1;
-      } else if(boardWidth === 17 && boardHeight === 15) {
-        this.currentMapSize = 'standard';
-        newSizeSetting = 0;
-      } else if(boardWidth === 24 && boardHeight === 21) {
-        this.currentMapSize = 'large';
-        newSizeSetting = 2;
       } else {
-        //Maybe they are trying to do a custom board size? Just keep map size the same for now.
-        newSizeSetting = null;
+        throw new Error(`Hook type "${hookType}" not found`);
+      }
+    },
+    registerHook: function(hookType, hookName, hookCallback) {
+      if(!this.hooks.hasOwnProperty(hookType) || !Array.isArray(this.hooks[hookType])) throw new Error(`Hook type not found`);
+
+      if(typeof hookName !== 'string' || typeof hookCallback !== 'function') {
+        throw new Error('hookName must be a string, hookCallback must be a function.');
       }
 
-      document.getElementById('custom-map-size').value = this.currentMapSize;
+      //Check hook not already registered
+      if(this.hooks[hookType].some(el=>el.name === hookName)) return;
+
+      this.hooks[hookType].push({name: hookName, callback: hookCallback});
+    }
+  }
+
+  ///////////////////////////////////////
+  //Taken from level-editor.js
+  ///////////////////////////////////////
+
+  //For localhost vs github version
+
+  const isProd = true;
+
+  globalThis.rootUrl;
+  globalThis.imagePresetsFolder;
+  globalThis.sharedUrl;
+  globalThis.randomHamUrl;
+  globalThis.challengeUrl;
+
+  if(isProd) {
+    //Live
+    globalThis.rootUrl = 'https://raw.githubusercontent.com/DarkSnakeGang/GoogleSnakeLevelEditor/main/';
+    globalThis.imagePresetsFolder = 'image-presets/';
+    globalThis.sharedUrl = 'https://raw.githubusercontent.com/DarkSnakeGang/GoogleSnakeLevelEditor/main/shared.js';
+    globalThis.randomHamUrl = 'https://raw.githubusercontent.com/DarkSnakeGang/GoogleSnakeLevelEditor/main/random_ham.txt';
+    globalThis.challengeUrl = 'https://raw.githubusercontent.com/DarkSnakeGang/GoogleSnakeLevelEditor/main/challenge.txt';
+  } else {
+    //Dev
+    globalThis.rootUrl = 'http://localhost:3000/';
+    globalThis.imagePresetsFolder = 'presets-windows-symlink/';
+    globalThis.sharedUrl = 'https://raw.githubusercontent.com/DarkSnakeGang/GoogleSnakeLevelEditor/main/shared.js';
+    globalThis.randomHamUrl = 'http://localhost:3000/random_ham.txt';
+    globalThis.challengeUrl = 'http://localhost:3000/challenge.txt';
+  }
+
+  //Used by make pattern
+  globalThis.roundApplePos = true;//For placing apples with mousedown
+  globalThis.mousePlaceMode = {category: 'apple', type:0};//Category could be apple, wall, drag or box, type corresponds to which apple
+  globalThis.disableWallMode = true;//Whether wall mode should place walls every 2 turns
+  globalThis.disableAppleInitialSpeed = false;
+  globalThis.customSnakeStart = {isActive:false, x:4, y:1};
+  globalThis.hasShownWarnings = {wall: false, sokoban: false};//Whether we have shown the warning about walls/boxes not having collisions without the right mode selected.
+  globalThis.customPresetManager = {
+    canvasWidth:370,
+    canvasHeight:340,
+    currentMapSize:'standard',
+    currentBoardWidth:17,
+    currentBoardHeight:15,
+    brush:'apple',
+    pixelList:[{x: 11, y: 7, category: 'apple', type: 0}],
+    isDrawing:false,
+    isErasing:false,
+    lastSpotDrawnOn:{x:undefined,y:undefined},
+    changeMapSize: function(newSize) {
+      let newSizeSetting = null;
+      this.currentMapSize = newSize;
+      switch(newSize) {
+        case 'small': 
+          this.currentBoardWidth = 10;
+          this.currentBoardHeight = 9;
+          newSizeSetting = 1;
+          break;
+        case 'standard': 
+          this.currentBoardWidth = 17;
+          this.currentBoardHeight = 15;
+          newSizeSetting = 0;
+          break;
+        case 'large': 
+          this.currentBoardWidth = 24;
+          this.currentBoardHeight = 21;
+          newSizeSetting = 2;
+          break;
+        default:
+          throw new Error(`Unrecognised map size! Found ${newSize}`);
+      }
+
+      //Clear out old map (and triggers a draw afterwards)
+      this.clearAll();
+      this.placeInitialApple();
+      this.draw();//Technically we draw twice in a row since clearAll also draws, but ¯\_(ツ)_/¯
 
       //Also change real map size
       selectNewSizeSettingAndHardReset(newSizeSetting);
-    }
-  } catch (err) {
-    //Just skip and keep current map size.
-  }
+    },
+    draw: function() {
+      const tileWidth = this.canvasWidth/this.currentBoardWidth;
+      const tileHeight = this.canvasHeight/this.currentBoardHeight;
 
-  this.draw();
-},
-getPixelListFromLevelCode: function(levelCode) {
-  levelCode = levelCode.trim();
+      this.ctx.fillStyle = "#a2d149";
+      this.ctx.fillRect(0,0,this.canvasWidth,this.canvasHeight);
 
-  let newPixelList = [];
+      this.ctx.fillStyle = "#aad751";
+      for(let j = 0; j < this.currentBoardHeight; j++) {
+        for(let i = 0; i < this.currentBoardWidth; i++) {
+          if((i + j) % 2 === 0) {
+            this.ctx.fillRect(i*tileWidth, j*tileHeight, tileWidth, tileHeight);
+          }
+        }
+      }
 
-  let codesArray = levelCode.split(' ');
-
-  //Start from 1 since 0 contains board size which we don't need for pixelList
-  for(let i = 1; i < codesArray.length; i++) {
-    try {
-      let entityLetter = codesArray[i][0]; //First letter indicates where it is apple, box...
-      let coordPart = codesArray[i].substr(1);
-      let coords = coordPart.split(',');
-
-      //Skip if coords are bad.
-      let coordX = parseInt(coords[0]);
-      let coordY = parseInt(coords[1]);
-
-      if(!isFinite(coordX) || !isFinite(coordY) || coordX < 0 || coordY < 0) continue;
-
-      switch(entityLetter) {
-        case 'A':
-          //Apple
-          newPixelList.push({x: coordX, y: coordY, category: 'apple', type: 0});
+      for(let k of this.pixelList) {
+        this.drawEntity(k.x * tileWidth, k.y * tileHeight, tileWidth, tileHeight, k.category, k.type);
+      }
+    },
+    drawEntity: function(xCoord, yCoord, width, height, category, type) {
+      switch(category) {
+        case 'apple':
+          this.ctx.fillStyle = "#E05826";
+          this.ctx.fillRect(xCoord, yCoord, width, height);
           break;
-        case 'W':
-          //Wall
-          newPixelList.push({x: coordX, y: coordY, category: 'wall', type: -1});
+        case 'wall':
+          this.ctx.fillStyle = "#578A34";
+          this.ctx.fillRect(xCoord, yCoord, width, height);
           break;
-        case 'B':
-          //Box
-          newPixelList.push({x: coordX, y: coordY, category: 'box', type: -1});
+        case 'box':
+          this.ctx.fillStyle = "#F0A036";
+          this.ctx.fillRect(xCoord, yCoord, width, height);
           break;
-        case 'S':
-          //Snakehead
-          newPixelList.push({x: coordX, y: coordY, category: 'snakehead', type: -1});
+        case 'snakehead':
+          this.ctx.fillStyle = "#4673E8";
+          this.ctx.fillRect(xCoord, yCoord, width, height);
           break;
         default:
-          throw new Error('Unrecognise entity letter');
+          throw new Error(`Unexpected item to draw on custom preset canvas. Received: ${category}`);
       }
-    } catch(err) {
-      //Just skip and process next code
+    },
+    clearAll: function() {
+      this.pixelList = [];
+      this.draw();
+    },
+    handleMouseDownOnBoard: function(event) {
+      event.preventDefault();
+
+      if(event.button === 0) {
+        customPresetManager.isDrawing = true;
+      } else if(event.button === 2) {
+        customPresetManager.isErasing = true;
+      } else {
+        return;
+      }
+
+      const rect = document.getElementById('custom-preset-canvas').getBoundingClientRect();
+
+      customPresetManager.attemptPlace(event.clientX - rect.left, event.clientY - rect.top, customPresetManager.isErasing);
+    },
+    handleMouseUpAnywhere: function(event) {
+      event.preventDefault();
+
+      if(event.button === 0) {
+        customPresetManager.isDrawing = false;
+      } else if(event.button === 2) {
+        customPresetManager.isErasing = false;
+      } else {
+        return;
+      }
+
+      customPresetManager.lastSpotDrawnOn = {x:undefined,y:undefined};
+    },
+    handleMouseMoveOnBoard: function(event) {
+      if(!customPresetManager.isDrawing && !customPresetManager.isErasing) return;
+
+      const rect = document.getElementById('custom-preset-canvas').getBoundingClientRect();
+      customPresetManager.attemptPlace(event.clientX - rect.left, event.clientY - rect.top, customPresetManager.isErasing);
+    },
+    attemptPlace: function(xPixelCoord, yPixelCoord, isErase=false) {
+      //Try to place entity corresponding to current brush into the pixelList.
+      
+      //Convert pixels coords into board coords
+      const tileWidth = this.canvasWidth/this.currentBoardWidth;
+      const tileHeight = this.canvasHeight/this.currentBoardHeight;
+      const boardXCoord = Math.floor(xPixelCoord/tileWidth);
+      const boardYCoord = Math.floor(yPixelCoord/tileHeight);
+
+      //Exit early if the mouse is still on the same square
+      if(this.lastSpotDrawnOn.x === boardXCoord && this.lastSpotDrawnOn.y === boardYCoord) return;
+      this.lastSpotDrawnOn = {x:boardXCoord, y:boardYCoord};
+
+      //Exit early if out of bounds
+      if(boardXCoord < 0 || boardYCoord < 0 || boardXCoord >= this.currentBoardWidth || boardYCoord >= this.currentBoardHeight) return;
+
+      this.removeAtCoord(boardXCoord, boardYCoord); 
+
+      //If we're erasing then exit just after erasing
+      if(isErase) {
+        this.draw();
+        return;
+      }
+
+      switch(this.brush) {
+        case 'apple':
+          this.pixelList.push({ x: boardXCoord, y: boardYCoord, category: 'apple', type: 0});
+          break;
+        case 'wall':
+          this.pixelList.push({ x: boardXCoord, y: boardYCoord, category: 'wall', type: -1});
+          break;
+        case 'box':
+          this.pixelList.push({ x: boardXCoord, y: boardYCoord, category: 'box', type: -1});
+          break;
+        case 'snakehead':
+          //Also remove any other snakehead instances.
+          this.removeSnakeHeads();
+          this.pixelList.push({ x: boardXCoord, y: boardYCoord, category: 'snakehead', type: -1});
+          break;
+        case 'erase':
+          //Do nothing since we remove earlier
+          break;
+        default:
+          throw new Error(`Unrecognised brush type ${this.brush}`);
+      }
+
+      //Always redraw (this might be unecessary if we're placing on an occupied spot, but there's no real harm in this)
+      this.draw();
+    },
+    removeAtCoord: function(boardX, boardY) {
+      let i = this.pixelList.length;
+      while(i--) {
+        if(this.pixelList[i].x === boardX && this.pixelList[i].y === boardY) {
+          this.pixelList.splice(i, 1);
+        }
+      }
+    },
+    removeSnakeHeads: function() {
+      let i = this.pixelList.length;
+      while(i--) {
+        if(this.pixelList[i].category === 'snakehead') {
+          this.pixelList.splice(i, 1);
+        }
+      }
+    },
+    placeInitialApple: function() {
+      //Places a single apple. This is because otherwise the game will be an instant-win
+      this.pixelList.push({x: Math.floor(this.currentBoardWidth * 3/4), y: Math.floor(this.currentBoardHeight/2), category: 'apple', type: 0});
+    },
+    getExportCode: function() {
+      let codesArray = [];
+
+      //First part gives the map size.
+      codesArray.push(`${this.currentBoardWidth}x${this.currentBoardHeight}`);
+
+      for(let entity of this.pixelList) {
+        switch(entity.category) {
+          case 'apple':
+            codesArray.push(`A${entity.x},${entity.y}`);
+            break;
+          case 'wall':
+            codesArray.push(`W${entity.x},${entity.y}`);
+            break;
+          case 'box':
+            codesArray.push(`B${entity.x},${entity.y}`);
+            break;
+          case 'snakehead':
+            codesArray.push(`S${entity.x},${entity.y}`);
+            break;
+          case 'default':
+            throw new Error('Unrecognise category when getting export code');
+        }
+      }
+
+      return codesArray.join(' ');
+    },
+    importCode: function(fullCode) {
+      fullCode = fullCode.trim();
+
+      //Process the main part of the code.
+      this.pixelList = this.getPixelListFromLevelCode(fullCode);
+
+      //First part gives map size
+      try {
+        let mapPart = fullCode.split(' ')[0]
+        let [boardWidth, boardHeight] = mapPart.split('x');
+
+        boardWidth = parseInt(boardWidth);
+        boardHeight = parseInt(boardHeight);
+
+        if(typeof boardWidth === 'number' && typeof boardHeight === 'number' && isFinite(boardWidth) && isFinite(boardHeight) && boardWidth > 0 && boardHeight > 0) {
+          this.currentBoardWidth = boardWidth;
+          this.currentBoardHeight = boardHeight;
+
+          let newSizeSetting = null;
+
+          if(boardWidth === 10 && boardHeight === 9) {
+            this.currentMapSize = 'small';
+            newSizeSetting = 1;
+          } else if(boardWidth === 17 && boardHeight === 15) {
+            this.currentMapSize = 'standard';
+            newSizeSetting = 0;
+          } else if(boardWidth === 24 && boardHeight === 21) {
+            this.currentMapSize = 'large';
+            newSizeSetting = 2;
+          } else {
+            //Maybe they are trying to do a custom board size? Just keep map size the same for now.
+            newSizeSetting = null;
+          }
+
+          document.getElementById('custom-map-size').value = this.currentMapSize;
+
+          //Also change real map size
+          selectNewSizeSettingAndHardReset(newSizeSetting);
+        }
+      } catch (err) {
+        //Just skip and keep current map size.
+      }
+
+      this.draw();
+    },
+    getPixelListFromLevelCode: function(levelCode) {
+      levelCode = levelCode.trim();
+
+      let newPixelList = [];
+
+      let codesArray = levelCode.split(' ');
+
+      //Start from 1 since 0 contains board size which we don't need for pixelList
+      for(let i = 1; i < codesArray.length; i++) {
+        try {
+          let entityLetter = codesArray[i][0]; //First letter indicates where it is apple, box...
+          let coordPart = codesArray[i].substr(1);
+          let coords = coordPart.split(',');
+
+          //Skip if coords are bad.
+          let coordX = parseInt(coords[0]);
+          let coordY = parseInt(coords[1]);
+
+          if(!isFinite(coordX) || !isFinite(coordY) || coordX < 0 || coordY < 0) continue;
+
+          switch(entityLetter) {
+            case 'A':
+              //Apple
+              newPixelList.push({x: coordX, y: coordY, category: 'apple', type: 0});
+              break;
+            case 'W':
+              //Wall
+              newPixelList.push({x: coordX, y: coordY, category: 'wall', type: -1});
+              break;
+            case 'B':
+              //Box
+              newPixelList.push({x: coordX, y: coordY, category: 'box', type: -1});
+              break;
+            case 'S':
+              //Snakehead
+              newPixelList.push({x: coordX, y: coordY, category: 'snakehead', type: -1});
+              break;
+            default:
+              throw new Error('Unrecognise entity letter');
+          }
+        } catch(err) {
+          //Just skip and process next code
+        }
+      }
+
+      return newPixelList;
     }
-  }
+  };
 
-  return newPixelList;
-}
+  window.otherPresetmanager = {
+    isHamsLoaded: false,
+    isChallengeLoaded: false,
+    hamLevelCodes: [],
+    challengeLevelCodes: [],
+    randomHamAppleCount: 5,
+    challengelevel: 1,
+    loadRandomHams: function() {
+      fetch(randomHamUrl)
+      .then(response=>response.text())
+      .then(allHamCodes=>{
+        otherPresetmanager.hamLevelCodes = allHamCodes.split('\n');
+        otherPresetmanager.isHamsLoaded = true;
+      });
+    },
+    loadChallenge: function() {
+      fetch(challengeUrl)
+      .then(response=>response.text())
+      .then(allChallengeCodes=>{
+        otherPresetmanager.challengeLevelCodes = allChallengeCodes.split('\n');
+        otherPresetmanager.isChallengeLoaded = true;
+      });
+    },
+    getRandomHamPixelList: function() {
+      if(!this.isHamsLoaded) return [];
 
-};
+      //Choose random level
+      const chosenLevelCode = this.hamLevelCodes[Math.floor(Math.random() * this.hamLevelCodes.length)];
 
-window.otherPresetmanager = {
-isHamsLoaded: false,
-isChallengeLoaded: false,
-hamLevelCodes: [],
-challengeLevelCodes: [],
-randomHamAppleCount: 5,
-challengelevel: 1,
-loadRandomHams: function() {
-fetch(randomHamUrl)
-.then(response=>response.text())
-.then(allHamCodes=>{
-otherPresetmanager.hamLevelCodes = allHamCodes.split('\n');
-otherPresetmanager.isHamsLoaded = true;
-});
-},
-loadChallenge: function() {
-fetch(challengeUrl)
-.then(response=>response.text())
-.then(allChallengeCodes=>{
-otherPresetmanager.challengeLevelCodes = allChallengeCodes.split('\n');
-otherPresetmanager.isChallengeLoaded = true;
-});
-},
-getRandomHamPixelList: function() {
-if(!this.isHamsLoaded) return [];
+      //Get pixelList
+      let hamPixelList = customPresetManager.getPixelListFromLevelCode(chosenLevelCode);
 
-//Choose random level
-  const chosenLevelCode = this.hamLevelCodes[Math.floor(Math.random() * this.hamLevelCodes.length)];
+      //Add some apples
+      let appleDesiredCoords;
+      
+      switch(this.randomHamAppleCount) {
+        case 1: 
+          appleDesiredCoords = [{x:7,y:4}];
+          break;
+        case 3:
+          appleDesiredCoords = [{x:5,y:2},{x:7,y:4},{x:5,y:6}];
+          break;
+        case 5:
+          appleDesiredCoords = [{x:4,y:2},{x:8,y:2},{x:6,y:4},{x:4,y:6},{x:8,y:6}];
+          break;
+        default:
+          throw new Error('Unexpected apple count for random ham');
+      }
 
-  //Get pixelList
-  let hamPixelList = customPresetManager.getPixelListFromLevelCode(chosenLevelCode);
+      for(let apple of appleDesiredCoords) {
+        //Add the apples to the pixelList
+        if(hamPixelList.some(entity=>entity.x === apple.x && entity.y === apple.y)) {
+          //If the spot an apple would normally be is occupied, then move it one space up.
+          apple.y--;
+        }
 
-  //Add some apples
-  let appleDesiredCoords;
+        hamPixelList.push({x: apple.x, y: apple.y, category: 'apple', type: 0});
+      }
+
+      return hamPixelList;
+    },
+    getChallengePixelList: function() {
+      if(!this.isChallengeLoaded) return [];
+
+      const chosenLevelCode = this.challengeLevelCodes[this.challengelevel - 1];
+
+      //Get pixelList
+      let challengePixelList = customPresetManager.getPixelListFromLevelCode(chosenLevelCode);
+
+      return challengePixelList;
+    }
+  };
+
+  window.setPixelData = function(target, url, callback = null) {
+    target.complete = false;
   
-  switch(this.randomHamAppleCount) {
-    case 1: 
-      appleDesiredCoords = [{x:7,y:4}];
-      break;
-    case 3:
-      appleDesiredCoords = [{x:5,y:2},{x:7,y:4},{x:5,y:6}];
-      break;
-    case 5:
-      appleDesiredCoords = [{x:4,y:2},{x:8,y:2},{x:6,y:4},{x:4,y:6},{x:8,y:6}];
-      break;
-    default:
-      throw new Error('Unexpected apple count for random ham');
-  }
-
-  for(let apple of appleDesiredCoords) {
-    //Add the apples to the pixelList
-    if(hamPixelList.some(entity=>entity.x === apple.x && entity.y === apple.y)) {
-      //If the spot an apple would normally be is occupied, then move it one space up.
-      apple.y--;
+    fetch(url)
+      .then(function (response) {
+        if (!response.ok) {
+          throw new Error('HTTP error, status = ' + response.status);
+        }
+        return response.blob();
+      })
+      .then(function (myBlob) {
+        let objectURL = URL.createObjectURL(myBlob);
+        let img = document.createElement('img');
+        img.src = objectURL;
+        if (img.complete) {
+          extractImageData(img, objectURL);
+        } else {
+          img.addEventListener('load', function () { extractImageData(img, objectURL) });
+          img.addEventListener('error', function () { alert('Error loading image') })
+        }
+      })
+      .catch(function (error) {
+        console.log(error);
+      });
+  
+    function extractImageData(img, objectURL) {
+      let canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      let ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, img.width, img.height);
+      let imageDataArray = ctx.getImageData(0, 0, img.width, img.height).data;
+      let pixelList = [];//Contains hex and coords
+      for (let i = 0; i < imageDataArray.length; i += 4) {
+        let hex = rgbToHex(imageDataArray[i], imageDataArray[i + 1], imageDataArray[i + 2]);
+        let pixelDetails = hexToPixelDetails(hex);
+        pixelList.push({ x: i / 4 % img.width, y: Math.floor((i / 4) / img.width), hex: hex, category: pixelDetails.category, type: pixelDetails.type });
+      }
+      URL.revokeObjectURL(objectURL);
+      target.pixelList = pixelList;
+      target.complete = true;
+      if (callback) {
+        callback();
+      }
     }
-
-    hamPixelList.push({x: apple.x, y: apple.y, category: 'apple', type: 0});
+  
   }
-
-  return hamPixelList;
-},
-getChallengePixelList: function() {
-  if(!this.isChallengeLoaded) return [];
-
-  const chosenLevelCode = this.challengeLevelCodes[this.challengelevel - 1];
-
-  //Get pixelList
-  let challengePixelList = customPresetManager.getPixelListFromLevelCode(chosenLevelCode);
-
-  return challengePixelList;
-}
-
-};
-
-window.setPixelData = function(target, url, callback = null) {
-target.complete = false;
-
-fetch(url)
-  .then(function (response) {
-    if (!response.ok) {
-      throw new Error('HTTP error, status = ' + response.status);
+  
+  window.blitPattern = function(pixelList, offsetX=0, offsetY=0) {
+    customSnakeStart.isActive = false;
+    emptyApples();
+    emptySokoboxes();
+    emptySokogoals();
+    for(let i=0;i<pixelList.length;i++) {
+      switch(pixelList[i].category) {
+        case 'apple':
+          if(pixelList[i].type != -1) {
+            let intialSpeed = undefined;//Default to using speed given by winged mode, or whatever mode is selected
+            if(disableAppleInitialSpeed) {
+              intialSpeed = {x:0, y:0};
+            }
+            window.placeApple(pixelList[i].x + offsetX,pixelList[i].y + offsetY,pixelList[i].type, intialSpeed);
+          }
+          break;
+        case 'wall':
+          window.placeWall(pixelList[i].x, pixelList[i].y, true);
+          break;
+        case 'box':
+          window.placeSokobox(pixelList[i].x, pixelList[i].y);
+          break;
+        case 'snakehead':
+          //Do nothing since we handle the snakehead stuff somewhere else
+          //setSnakeHead(pixelList[i].x, pixelList[i].y);
+          break;
+        default:
+          throw Error('Unrecognised category!');
+      }
+      
     }
-    return response.blob();
-  })
-  .then(function (myBlob) {
-    let objectURL = URL.createObjectURL(myBlob);
-    let img = document.createElement('img');
-    img.src = objectURL;
-    if (img.complete) {
-      extractImageData(img, objectURL);
+  }
+  
+  window.blitSelectedPreset = function() {
+    let presetEl = document.getElementsByClassName('chosen-preset')?.[0];
+  
+    if(!presetEl) {
+      throw new Error('No element with chosen preset class?!? Should never happen.');
+    }
+  
+    if(presetEl.classList.contains('preset-none')) return;
+  
+    let isUsingCustomPreset = presetEl.classList.contains('preset-custom');
+    let isUsingRandomHamPreset = presetEl.classList.contains('preset-random-ham');
+    let isUsingChallengePreset = presetEl.classList.contains('preset-challenge');
+    let patternPixelList;
+  
+    if(isUsingCustomPreset) {
+      patternPixelList = customPresetManager.pixelList;
+    } else if(isUsingRandomHamPreset) {
+      patternPixelList = otherPresetmanager.getRandomHamPixelList();
+    } else if(isUsingChallengePreset) {
+      patternPixelList = otherPresetmanager.getChallengePixelList();
     } else {
-      img.addEventListener('load', function () { extractImageData(img, objectURL) });
-      img.addEventListener('error', function () { alert('Error loading image') })
+      //Blit Pattern
+      let imageUrl = presetEl.src;
+      //Remove the start of the url so we are just left with a file path which can be used as a key for the pattern.
+      let patternName = imageUrl.replace(rootUrl,'');
+  
+      patternPixelList = presetPatterns[patternName].pixelList
     }
-  })
-  .catch(function (error) {
-    console.log(error);
-  });
-
-function extractImageData(img, objectURL) {
-  let canvas = document.createElement('canvas');
-  canvas.width = img.width;
-  canvas.height = img.height;
-  let ctx = canvas.getContext('2d');
-  ctx.drawImage(img, 0, 0, img.width, img.height);
-  let imageDataArray = ctx.getImageData(0, 0, img.width, img.height).data;
-  let pixelList = [];//Contains hex and coords
-  for (let i = 0; i < imageDataArray.length; i += 4) {
-    let hex = rgbToHex(imageDataArray[i], imageDataArray[i + 1], imageDataArray[i + 2]);
-    let pixelDetails = hexToPixelDetails(hex);
-    pixelList.push({ x: i / 4 % img.width, y: Math.floor((i / 4) / img.width), hex: hex, category: pixelDetails.category, type: pixelDetails.type });
+  
+    //Make sure they aren't using a big preset on a small map.
+    if(!checkPatternInBounds(patternPixelList)) {
+      alert('The current board size is too small to use the currently selected pattern.');
+      return;
+    }
+  
+    let spawnOffset = getAppleSpawnPointOffset();
+  
+    blitPattern(patternPixelList, spawnOffset.x, spawnOffset.y);
   }
-  URL.revokeObjectURL(objectURL);
-  target.pixelList = pixelList;
-  target.complete = true;
-  if (callback) {
-    callback();
+  
+  window.setSelectedSnakeHead = function() {
+    customSnakeStart.isActive = false;
+    let presetEl = document.getElementsByClassName('chosen-preset')?.[0];
+  
+    if(!presetEl) {
+      throw new Error('No element with chosen preset class?!? Should never happen.');
+    }
+  
+    if(presetEl.classList.contains('preset-none')) return;
+    if(presetEl.classList.contains('preset-random-ham')) return;
+    let isUsingCustomPreset = presetEl.classList.contains('preset-custom');
+    let isUsingChallengePreset = presetEl.classList.contains('preset-challenge');
+    let patternPixelList;
+  
+    if(isUsingCustomPreset) {
+      patternPixelList = customPresetManager.pixelList;
+    } else if(isUsingChallengePreset) {
+      patternPixelList = otherPresetmanager.getChallengePixelList();
+    } else {
+      //Blit Pattern
+      let imageUrl = presetEl.src;
+      //Remove the start of the url so we are just left with a file path which can be used as a key for the pattern.
+      let patternName = imageUrl.replace(rootUrl,'');
+  
+      patternPixelList = presetPatterns[patternName].pixelList
+    }
+  
+    //Make sure they aren't using a big preset on a small map.
+    if(!checkPatternInBounds(patternPixelList)) return;
+  
+    let pixelWithSnakeHead = patternPixelList.find(x=>x.category==='snakehead');
+  
+    if(pixelWithSnakeHead) {
+      setSnakeHead(pixelWithSnakeHead.x, pixelWithSnakeHead.y);
+    }
   }
-}
-
-}
-
-window.blitPattern = function(pixelList, offsetX=0, offsetY=0) {
-customSnakeStart.isActive = false;
-emptyApples();
-emptySokoboxes();
-emptySokogoals();
-for(let i=0;i<pixelList.length;i++) {
-switch(pixelList[i].category) {
-case 'apple':
-if(pixelList[i].type != -1) {
-let intialSpeed = undefined;//Default to using speed given by winged mode, or whatever mode is selected
-if(disableAppleInitialSpeed) {
-intialSpeed = {x:0, y:0};
-}
-window.placeApple(pixelList[i].x + offsetX,pixelList[i].y + offsetY,pixelList[i].type, intialSpeed);
-}
-break;
-case 'wall':
-window.placeWall(pixelList[i].x, pixelList[i].y, true);
-break;
-case 'box':
-window.placeSokobox(pixelList[i].x, pixelList[i].y);
-break;
-case 'snakehead':
-//Do nothing since we handle the snakehead stuff somewhere else
-//setSnakeHead(pixelList[i].x, pixelList[i].y);
-break;
-default:
-throw Error('Unrecognised category!');
-}
-
-}
-
-}
-
-window.blitSelectedPreset = function() {
-let presetEl = document.getElementsByClassName('chosen-preset')?.[0];
-
-if(!presetEl) {
-  throw new Error('No element with chosen preset class?!? Should never happen.');
-}
-
-if(presetEl.classList.contains('preset-none')) return;
-
-let isUsingCustomPreset = presetEl.classList.contains('preset-custom');
-let isUsingRandomHamPreset = presetEl.classList.contains('preset-random-ham');
-let isUsingChallengePreset = presetEl.classList.contains('preset-challenge');
-let patternPixelList;
-
-if(isUsingCustomPreset) {
-  patternPixelList = customPresetManager.pixelList;
-} else if(isUsingRandomHamPreset) {
-  patternPixelList = otherPresetmanager.getRandomHamPixelList();
-} else if(isUsingChallengePreset) {
-  patternPixelList = otherPresetmanager.getChallengePixelList();
-} else {
-  //Blit Pattern
-  let imageUrl = presetEl.src;
-  //Remove the start of the url so we are just left with a file path which can be used as a key for the pattern.
-  let patternName = imageUrl.replace(rootUrl,'');
-
-  patternPixelList = presetPatterns[patternName].pixelList
-}
-
-//Make sure they aren't using a big preset on a small map.
-if(!checkPatternInBounds(patternPixelList)) {
-  alert('The current board size is too small to use the currently selected pattern.');
-  return;
-}
-
-let spawnOffset = getAppleSpawnPointOffset();
-
-blitPattern(patternPixelList, spawnOffset.x, spawnOffset.y);
-
-}
-
-window.setSelectedSnakeHead = function() {
-customSnakeStart.isActive = false;
-let presetEl = document.getElementsByClassName('chosen-preset')?.[0];
-
-if(!presetEl) {
-  throw new Error('No element with chosen preset class?!? Should never happen.');
-}
-
-if(presetEl.classList.contains('preset-none')) return;
-if(presetEl.classList.contains('preset-random-ham')) return;
-let isUsingCustomPreset = presetEl.classList.contains('preset-custom');
-let isUsingChallengePreset = presetEl.classList.contains('preset-challenge');
-let patternPixelList;
-
-if(isUsingCustomPreset) {
-  patternPixelList = customPresetManager.pixelList;
-} else if(isUsingChallengePreset) {
-  patternPixelList = otherPresetmanager.getChallengePixelList();
-} else {
-  //Blit Pattern
-  let imageUrl = presetEl.src;
-  //Remove the start of the url so we are just left with a file path which can be used as a key for the pattern.
-  let patternName = imageUrl.replace(rootUrl,'');
-
-  patternPixelList = presetPatterns[patternName].pixelList
-}
-
-//Make sure they aren't using a big preset on a small map.
-if(!checkPatternInBounds(patternPixelList)) return;
-
-let pixelWithSnakeHead = patternPixelList.find(x=>x.category==='snakehead');
-
-if(pixelWithSnakeHead) {
-  setSnakeHead(pixelWithSnakeHead.x, pixelWithSnakeHead.y);
-}
-
-}
-
-window.componentToHex = function(c) {
-var hex = c.toString(16);
-return hex.length == 1 ? "0" + hex : hex;
-}
-
-/*
-Used to tell if a pixel corresponds to a apple or a wall or a sokoban box
-Also gives info on what type of apple (e.g. apples or oranges)
-*/
-window.hexToPixelDetails = function(hex) {
-hex = hex.toUpperCase();
-
-//Value gives the category, if it's not found then this is assumed to be "apple"
-const hexToCategory = {
-  '#578A34': 'wall',//Wall
-  '#F0A036': 'box',//Boxes from sokoban, color is slight off average, but good enough imo
-  '#4673E8': 'snakehead'//Start Position of the snake
-};
-
-let category = 'apple';
-
-if(hexToCategory.hasOwnProperty(hex)) {
-  category = hexToCategory[hex];
-} else {
-  category = 'apple'; //Defensive programming, though kinda unnecessary idk?
-}
-
-//Index gives the type, if it isn't found then it would be -1 corresponding to no apple
-const hexToTypeMapping = [
-  '#E05826',//Apple
-  '#DABC1F',//Banana
-  '#C5830E',//Pineapple
-  '#8D2DA0',//Grapes
-  '#E68A1B',//Apricot?
-  '#D4D2D1',//Onion
-  '#904FA3',//Aubergine
-  '#CD6512',//Strawberry
-  '#CE6A29',//Cherry
-  '#DE9713',//Carrot
-  '#E4A588',//Mushroom
-  '#009000',//Brocolli
-  '#C77B4A',//Watermelon
-  '#14A019',//Green pepper
-  '#6AB927',//Kiwi
-  '#EFCF1E',//Lemon
-  '#F28F13',//Orange
-  '#F38768',//Peach
-  '#C7913C',//Peanut
-  '#E74738',//Raspberry
-  '#F24311'//Tomato    
-];
-
-//For reference - the full color list is
-/*
-  E05826//Apple
-  DABC1F//Banana
-  C5830E//Pineapple
-  8D2DA0//Grapes
-  E68A1B//Apricot?
-  D4D2D1//Onion
-  904FA3//Aubergine
-  CD6512//Strawberry
-  CE6A29//Cherry
-  DE9713//Carrot
-  E4A588//Mushroom
-  009000//Brocolli
-  C77B4A//Watermelon
-  14A019//Green pepper
-  6AB927//Kiwi
-  EFCF1E//Lemon
-  F28F13//Orange
-  F38768//Peach
-  C7913C//Peanut
-  E74738//Raspberry
-  F24311//Tomato
-*/
-
-return {category: category, type: hexToTypeMapping.indexOf(hex)};
-
-}
-
-window.rgbToHex = function(r, g, b) {
-return "#" + componentToHex(r) + componentTo- Continue
-}
+  
+  window.componentToHex = function(c) {
+    var hex = c.toString(16);
+    return hex.length == 1 ? "0" + hex : hex;
+  }
+  
+  /*
+  Used to tell if a pixel corresponds to a apple or a wall or a sokoban box
+  Also gives info on what type of apple (e.g. apples or oranges)
+  */
+  window.hexToPixelDetails = function(hex) {
+    hex = hex.toUpperCase();
+  
+    //Value gives the category, if it's not found then this is assumed to be "apple"
+    const hexToCategory = {
+      '#578A34': 'wall',//Wall
+      '#F0A036': 'box',//Boxes from sokoban, color is slight off average, but good enough imo
+      '#4673E8': 'snakehead'//Start Position of the snake
+    };
+  
+    let category = 'apple';
+  
+    if(hexToCategory.hasOwnProperty(hex)) {
+      category = hexToCategory[hex];
+    } else {
+      category = 'apple'; //Defensive programming, though kinda unnecessary idk?
+    }
+  
+    //Index gives the type, if it isn't found then it would be -1 corresponding to no apple
+    const hexToTypeMapping = [
+      '#E05826',//Apple
+      '#DABC1F',//Banana
+      '#C5830E',//Pineapple
+      '#8D2DA0',//Grapes
+      '#E68A1B',//Apricot?
+      '#D4D2D1',//Onion
+      '#904FA3',//Aubergine
+      '#CD6512',//Strawberry
+      '#CE6A29',//Cherry
+      '#DE9713',//Carrot
+      '#E4A588',//Mushroom
+      '#009000',//Brocolli
+      '#C77B4A',//Watermelon
+      '#14A019',//Green pepper
+      '#6AB927',//Kiwi
+      '#EFCF1E',//Lemon
+      '#F28F13',//Orange
+      '#F38768',//Peach
+      '#C7913C',//Peanut
+      '#E74738',//Raspberry
+      '#F24311'//Tomato    
+    ];
+  
+    //For reference - the full color list is
+    /*
+      E05826//Apple
+      DABC1F//Banana
+      C5830E//Pineapple
+      8D2DA0//Grapes
+      E68A1B//Apricot?
+      D4D2D1//Onion
+      904FA3//Aubergine
+      CD6512//Strawberry
+      CE6A29//Cherry
+      DE9713//Carrot
+      E4A588//Mushroom
+      009000//Brocolli
+      C77B4A//Watermelon
+      14A019//Green pepper
+      6AB927//Kiwi
+      EFCF1E//Lemon
+      F28F13//Orange
+      F38768//Peach
+      C7913C//Peanut
+      E74738//Raspberry
+      F24311//Tomato
+    */
+  
+    return {category: category, type: hexToTypeMapping.indexOf(hex)};
+  }
+  
+  window.rgbToHex = function(r, g, b) {
+    return "#" + componentToHex(r) + componentToHex(g) + componentToHex(b);
+  }
+  
   window.placeAppleAtMouse = function(event) {
     let canvasRect = gameCanvasElMakePattern.getBoundingClientRect();
     const offsetFromBorder = {x:26,y:26};
@@ -1202,13 +1150,9 @@ return "#" + componentToHex(r) + componentTo- Continue
 ////////////////////////////////////////////////////////////////////
 
 window.levelEditorMod.alterSnakeCode = function(code) {
-  code = code.replaceAll(/\$\$/gm, `aaaa`); //Prevent issues with $$ in variable names breaking stuff when replaced
-
-  ///////////////////////////////////////
-  //Taken from shared.js
-  ///////////////////////////////////////
-
-  globalThis.tileWidth = code.assertMatch(/[a-z]\.[$a-zA-Z0-9_]{0,8}\.fillRect\([a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,8}\.([$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}),[a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8},[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8},[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\)/)[1];//wa
+  // Эта часть оставлена без изменений, чтобы другие моды работали
+  code = code.replaceAll(/\$\$/gm, `aaaa`);
+  globalThis.tileWidth = code.assertMatch(/[a-z]\.[$a-zA-Z0-9_]{0,8}\.fillRect\([a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,8}\.([$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}),[a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8},[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8},[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\)/)[1];
   [,globalThis.applePosProperty, globalThis.appleSpeedProperty] = code.assertMatch(/&&\([$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.x&&\([$a-zA-Z0-9_]{0,8}\.([$a-zA-Z0-9_]{0,8})\.x\+=[$a-zA-Z0-9_]{0,8}\.([$a-zA-Z0-9_]{0,8})\.x\),/);
   globalThis.bodyArray = code.assertMatch(/[a-z]=\n?this\.[$a-zA-Z0-9_]{0,8}\.([$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8})\[0\]\.clone\(\),"LEFT"/)[1];
   globalThis.makeApple = code.assertMatch(/this\.[$a-zA-Z0-9_]{0,8}\.push\(([$a-zA-Z0-9_]{0,8})\(this,-5,-4\)\)/)[1];
@@ -1217,21 +1161,68 @@ window.levelEditorMod.alterSnakeCode = function(code) {
   globalThis.coordConstructor = code.assertMatch(/new (_\.[$a-zA-Z0-9_]{0,8})\(1,1\)/)[1];
   globalThis.boardDimensions = code.assertMatch(/x===Math.floor\([a-z]\.[$a-zA-Z0-9_]{0,8}\.([$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8})\.width\/2\)&&/)[1];
   let [,modeCheck, settingsProperty] = code.assertMatch(/([$a-zA-Z0-9_]{0,8})\(this\.([$a-zA-Z0-9_]{0,8}),6\)/);
-
   let funcWithReset, funcWithResetOrig;
-  funcWithReset = funcWithResetOrig = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,8}\.reset=function\(\)$/,
-  /[a-z]=\n?\.66/,
-  false);
-
+  funcWithReset = funcWithResetOrig = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,8}\.reset=function\(\)$/, /[a-z]=\n?\.66/, false);
   funcWithReset = assertReplace(funcWithReset,'{','{globalThis.wholeSnakeObject = this;');
   funcWithReset = assertReplace(funcWithReset, /[$a-zA-Z0-9_]{0,8}\([a-z]\.[$a-zA-Z0-9_]{0,8}\)&&\([a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}=!0\)\)/, `$&;window.simpleHookManager.runHook('afterResetBoard')`);
   code = code.replace(funcWithResetOrig, funcWithReset);
-
   let funcWithResetState, funcWithResetStateOrig;
   funcWithResetState = funcWithResetStateOrig = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,8}\.prototype\.resetState=function\(a\)$/, /void 0===[a-z]\?!0:[a-z];this\.[$a-zA-Z0-9_]{0,8}\.reset\(a\);/);
   funcWithResetState = assertReplace(funcWithResetState, '{', '{globalThis.megaWholeSnakeObject = this;');
   code = code.replace(funcWithResetStateOrig, funcWithResetState);
 
+  
+  // --- НАЧАЛО НОВОГО БЛОКА ДЛЯ ПЕРЕХВАТА РЕСПАВНА ЯБЛОК ---
+  // Этот блок нужно было добавить.
+  
+  // 1. Находим функцию респавна (`mpl`) по её содержимому. 
+  // Это надежнее, чем искать по имени, которое может измениться.
+  // Мы ищем: function(a,b,c){... a.ka[b].pos=c; ...}
+  const respawnFuncSignature = /(function\([a-z],[a-z],[a-z]\){a\.ka\[[a-z]\]\.pos=[a-z];)/;
+
+  if (code.match(respawnFuncSignature)) {
+    // 2. Это наш код, который мы "вживим" в начало функции.
+    // Он будет менять координаты в переменной `c` до того, как их использует остальной код функции.
+    const injectionCode = `
+      try {
+        if (window.wholeSnakeObject) {
+          const snakeHead = window.wholeSnakeObject.oa.ka[0];
+          let offset = 1;
+          let newX = snakeHead.x + offset;
+          let newY = snakeHead.y;
+          let isOccupied = true;
+          
+          // Цикл, чтобы яблоки не появлялись друг на друге, если съесть несколько сразу
+          while(isOccupied) {
+            isOccupied = false;
+            newX = snakeHead.x + offset;
+            for(let i = 0; i < a.ka.length; i++) {
+              if (i !== b && a.ka[i].pos.x === newX && a.ka[i].pos.y === newY) {
+                isOccupied = true;
+                offset++;
+                break;
+              }
+            }
+          }
+          // Главное: меняем оригинальные координаты `c` на наши
+          c.x = newX;
+          c.y = newY;
+        }
+      } catch(e) {}
+    `;
+
+    // 3. Вставляем наш код сразу после первой открывающей скобки `{` в найденной функции.
+    // "$1" - это найденная часть (сигнатура функции), после которой мы вставляем наш код.
+    code = code.replace(respawnFuncSignature, `$1 ${injectionCode.replace(/\s+/g, ' ')}`);
+    console.log('[SNAKE MOD] Функция респавна яблок успешно изменена.');
+  } else {
+    console.error('[SNAKE MOD] Не удалось найти функцию респавна яблок для модификации.');
+  }
+
+  // --- КОНЕЦ НОВОГО БЛОКА ---
+
+
+  // Остальной код из мода остается без изменений
   (0,eval)(`
   function emptyApples() {
     window.wholeSnakeObject.${appleArrayHolderOfWholeSnakeObject}.${appleArray}.length = 0;
@@ -1252,211 +1243,11 @@ window.levelEditorMod.alterSnakeCode = function(code) {
   `, false);
 
   let wallDetailsContainer = code.assertMatch(/[$a-zA-Z0-9_]{0,8}&&\([$a-zA-Z0-9_]{0,8}\(this\.([$a-zA-Z0-9_]{0,8}),\n?[$a-zA-Z0-9_]{0,8}\),\n?[$a-zA-Z0-9_]{0,8}\(this\.[$a-zA-Z0-9_]{0,8},7\)/)[1];
-  let [,placeWallFunc,wallCoordProperty,otherProperty1,fakeWallProperty,otherProperty2] = code.assertMatch(/([$a-zA-Z0-9_]{0,8})\(this,[a-z],{([$a-zA-Z0-9_]{0,8}):[a-z],([$a-zA-Z0-9_]{0,8}:!1),([$a-zA-Z0-9_]{0,8}):!0,([$a-zA-Z0-9_]{0,8}:!0)}\)/);
+  let [,placeWallFunc,wallCoordProperty,otherProperty1,fakeWallProperty,otherProperty2] = code.assertMatch(/([$a-zA-Z0-9_]{0,8})\(this,[a-z],{([$a-zA-Z0-9_]{0,8}):[a-z],([$a-zA-Z0-9_]{0,8}:!1,[$a-zA-Z0-9_]{0,8}:-1),([$a-zA-Z0-9_]{0,8}):!0,([$a-zA-Z0-9_]{0,8}:!0,[$a-zA-Z0-9_]{0,8}:void 0)}\)/);
 
-  code = appendCodeWithinSnakeModule(code, `
-  globalThis.placeWall = function(x, y, banNeighbourSpawning = false) {
-    if(!${modeCheck}(window.wholeSnakeObject.${settingsProperty}, 1) && !window.hasShownWarnings.wall) {
-      alert("You must use wall mode for this to work, otherwise you will travel straight through walls. Use blender mode if you want to include other settings. We won't show this message again.");
-      window.hasShownWarnings.wall = true;
-    }
-
-    x = Math.round(x);
-    y = Math.round(y);
-    let wallCoord = new ${coordConstructor}(x, y);
-    ${placeWallFunc}(window.wholeSnakeObject.${wallDetailsContainer}, wallCoord,
-      {
-        ${wallCoordProperty}: wallCoord,
-        ${otherProperty1},
-        ${fakeWallProperty}: false,
-        ${otherProperty2}
-      }
-    );
-  }
-  `, false);
-
-  let wallSet = code.assertMatch(/([$a-zA-Z0-9_]{0,8})\.set\([$a-zA-Z0-9_]{0,8}\([a-z]\),[a-z]\);/)[1];
-  code = appendCodeWithinSnakeModule(code, `
-  globalThis.checkWall = function(x,y) {
-    if(x < 0 || x >= window.wholeSnakeObject.${boardDimensions}.width || y < 0 || y >= window.wholeSnakeObject.${boardDimensions}.height) {
-      return true;
-    }
-
-    let serialisedCoord = x << 16 | y;
-    let isWall = window.wholeSnakeObject.${wallDetailsContainer}.${wallSet}.has(serialisedCoord);
-    return isWall;
-  }
-  `, false);
-
-  let funcWithPlaceWall, funcWithPlaceWallOrig;
-  funcWithPlaceWall = funcWithPlaceWallOrig = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,8}=function\(a,\n?b\)$/, /[$a-zA-Z0-9_]{0,8}\([a-z],[a-z],{[$a-zA-Z0-9_]{0,8}:[a-z],[$a-zA-Z0-9_]{0,8}:!0,[$a-zA-Z0-9_]{0,8}:!1,\n?[$a-zA-Z0-9_]{0,8}:![$a-zA-Z0-9_]{0,8}\([a-z]\.[$a-zA-Z0-9_]{0,8},\n?11\)}\);/, false);
-  funcWithPlaceWall = assertReplace(funcWithPlaceWall, '{', `{
-  if(disableWallMode) {
-    return;
-  }
-  `);
-  code = code.replace(funcWithPlaceWallOrig, funcWithPlaceWall);
-
-  let sokoDetailsContainer = code.assertMatch(/this\.([$a-zA-Z0-9_]{0,8})\.reset\(\);if\([$a-zA-Z0-9_]{0,8}\(this\.[$a-zA-Z0-9_]{0,8},8\)/)[1];
-  let [, addSokoboxFunc, sokoPosition, sokoPrevProperty, sokoPlaySpawnAnimProperty, sokoLastProperty] = code.assertMatch(/([$a-zA-Z0-9_]{0,8})\([a-z],{([$a-zA-Z0-9_]{0,8}):[a-z],\n?([$a-zA-Z0-9_]{0,8}):null,([$a-zA-Z0-9_]{0,8}):!0,([$a-zA-Z0-9_]{0,8}):[a-z]}\)/);
-  let sokoboxSet = code.assertMatch(/[a-z]\.([$a-zA-Z0-9_]{0,8})\.add\([a-z]\);[$a-zA-Z0-9_]{0,8}\([a-z]\.settings,16\)/)[1];
-
-  code = appendCodeWithinSnakeModule(code, `
-  globalThis.placeSokobox = function(x,y) {
-    if(!${modeCheck}(window.wholeSnakeObject.${settingsProperty}, 9) && !window.hasShownWarnings.sokoban) {
-      alert("You must use sokoban (box) mode for this to work, otherwise you will travel straight through boxes. Use blender mode if you want to include other settings. We won't show this message again.");
-      window.hasShownWarnings.sokoban = true;
-    }
-
-    x = Math.round(x);
-    y = Math.round(y);
-    let sokoCoord = new ${coordConstructor}(x, y);
-    ${addSokoboxFunc}(window.wholeSnakeObject.${sokoDetailsContainer},
-      {
-        ${sokoPosition}: sokoCoord,
-        ${sokoPrevProperty}:null,
-        ${sokoPlaySpawnAnimProperty}:false,
-        ${sokoLastProperty}:true
-      });
-    }
-  `, false);
-
-  let sokogoalSet = code.assertMatch(/[$a-zA-Z0-9_]{0,8}\([a-z]\.[$a-zA-Z0-9_]{0,8},\n?7\)&&[a-z]\.([$a-zA-Z0-9_]{0,8})\.add\([$a-zA-Z0-9_]{0,8}\([a-z]\.[$a-zA-Z0-9_]{0,8},\n?[a-z]\)\),/)[1];
-  code = appendCodeWithinSnakeModule(code, `
-  globalThis.emptySokogoals = function(x,y) {
-    window.wholeSnakeObject.${sokoDetailsContainer}.${sokogoalSet}.clear();
-  }
-  `, false);
-  code = appendCodeWithinSnakeModule(code, `
-  globalThis.emptySokoboxes = function(x,y) {
-    window.wholeSnakeObject.${sokoDetailsContainer}.${sokoboxSet}.clear();
-  }
-  `, false);
-
-  let funcWithSnakeStartPos, funcWithSnakeStartPosOrig;
-  funcWithSnakeStartPos = funcWithSnakeStartPosOrig = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,8}\.prototype\.reset=function\(\)$/, /this\.[$a-zA-Z0-9_]{0,8}\.push\(new _\.[$a-zA-Z0-9_]{0,8}\(Math\.floor\(this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.width\/4\),Math\.floor\(this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.height\/2\)\)\);/, false);
-  funcWithSnakeStartPos = assertReplace(funcWithSnakeStartPos, /this\.([$a-zA-Z0-9_]{0,8})\.push\(new [^]*3,Math\.floor\(this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.height\/\n?2\)\)\);/, `setSelectedSnakeHead();
-    if(customSnakeStart.isActive) {
-      this.$1.push(new ${window.coordConstructor}(customSnakeStart.x, customSnakeStart.y));
-      this.$1.push(new ${window.coordConstructor}(customSnakeStart.x - 1, customSnakeStart.y));
-      this.$1.push(new ${window.coordConstructor}(customSnakeStart.x - 2, customSnakeStart.y));
-      this.$1.push(new ${window.coordConstructor}(customSnakeStart.x - 3, customSnakeStart.y));
-    } else {$&}`);
-  code = code.replace(funcWithSnakeStartPosOrig, funcWithSnakeStartPos);
-
-  let funcWithChangeSetting = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,8}=function\(a,b,c,d\)$/, /case "apple":[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}=[a-z];break;/, false);
-  globalThis.changeSettingFuncName = /[$a-zA-Z0-9_]{0,8}/.exec(funcWithChangeSetting)[0];
-  let menuProperty = code.assertMatch(/if\(this\.([$a-zA-Z0-9_]{0,8})\.isVisible\(\)\|\|this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\)/)[1];
-  let funcWithFullReset = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,8}=function\(\)$/, /if\(this\.[$a-zA-Z0-9_]{0,8}\.isVisible\(\)\|\|this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\)/, false);
-  globalThis.fullResetFuncName = /[$a-zA-Z0-9_]{0,8}/.exec(funcWithFullReset)[0];
-
-  code = appendCodeWithinSnakeModule(code, `
-  globalThis.selectNewSizeSettingAndHardReset = function(newSizeSetting) {
-    if(typeof window.megaWholeSnakeObject !== 'undefined' && newSizeSetting !== null) {
-      let sizeEl = document.getElementById('size');
-      ${changeSettingFuncName}(window.megaWholeSnakeObject.${menuProperty},sizeEl,true,newSizeSetting);
-      switch(newSizeSetting) {
-        case 0: sizeEl.style.left = '129.25px'; break;
-        case 1: sizeEl.style.left = '91.5px'; break;
-        case 2: sizeEl.style.left = '51.5px'; break;
-        default: throw new Error('Unsupported size setting.');
-      }
-    }
-    if(typeof window.megaWholeSnakeObject !== 'undefined') {
-      window.megaWholeSnakeObject.${menuProperty}.visible = true;
-      window.megaWholeSnakeObject[fullResetFuncName]();
-      window.megaWholeSnakeObject.${menuProperty}.visible = false;
-    }
-  }
-  `,false);
-
-  // --- НАЧАЛО ИСПРАВЛЕНИЙ ДЛЯ РЕСПАВНА ЯБЛОК (v4, самый надежный) ---
-  try {
-    // Этап 1: Находим функцию роста змейки. Она содержит ".unshift(this..." и ".clone()", а также вызов функции спавна "... .push(...(this))"
-    // Этот Regex более гибкий и должен выдерживать обновления. \.([$a-zA-Z0-9_]{0,8}) захватывает имя массива тела змейки.
-    // \2 - это обратная ссылка, чтобы убедиться, что в unshift и push используется один и тот же массив.
-    const growthFuncRegex = /([$a-zA-Z0-9_]{0,8}\.prototype\.[$a-zA-Z0-9_]{0,8})=function\([^)]*\){this\.([$a-zA-Z0-9_]{0,8})\.unshift\(this\.\2\[0\]\.clone\(\)\);.*?this\.\2\.push\(([$a-zA-Z0-9_]{0,8})\(this\)\)}/;
-    const growthFuncMatch = code.match(growthFuncRegex);
-
-    if (growthFuncMatch) {
-      // Этап 2: Извлекаем из нее имя функции-спавнера яблок (3-я захваченная группа).
-      const spawnerFuncName = growthFuncMatch[3];
-
-      // Этап 3: Теперь, зная имя, находим полное определение функции-спавнера.
-      // Ищем ее по имени и общей структуре "do {...} while(...); return new ...;"
-      const appleSpawnerRegex = new RegExp(`(${spawnerFuncName}=function\\(a\\){.*?do{.*?}while\\(!a\\..*?\\(b,c\\)\\);return new.*?\\(b,c\\)})`);
-      const appleSpawnerMatch = code.match(appleSpawnerRegex);
-
-      if (appleSpawnerMatch) {
-        const originalSpawnerFunc = appleSpawnerMatch[1];
-        
-        // Извлекаем "динамические" имена переменных из найденного кода
-        const boardState = originalSpawnerFunc.match(/a\.(.*?)\.width/)[1];
-        const isTileFreeCheck = originalSpawnerFunc.match(/while\(!a\.(.*?)\(b,c\)\)/)[1];
-        const coordConstructor = originalSpawnerFunc.match(/return new (.*?)\(b,c\)/)[1];
-        
-        // window.bodyArray - это глобальная переменная, которую мы нашли в самом начале. Она уже содержит правильный путь к массиву тела змейки.
-        const snakeBodyArray = `a.${window.bodyArray.split('.')[1]}`;
-
-        // Этап 4: Создаем нашу новую, улучшенную функцию и заменяем старую.
-        const newSpawnerFunc = `
-        ${spawnerFuncName} = function(a) {
-          const snakeHead = ${snakeBodyArray}[0];
-          const boardWidth = a.${boardState}.width;
-          const boardHeight = a.${boardState}.height;
-          const searchRadius = 5;
-          let b, c;
-          let isPositionValid = false;
-          let attempts = 0;
-          const maxAttempts = 50;
-          const spawnNearChance = 0.9;
-
-          if (snakeHead && Math.random() < spawnNearChance) {
-            while (!isPositionValid && attempts < maxAttempts) {
-              attempts++;
-              const offsetX = Math.floor(Math.random() * (2 * searchRadius + 1)) - searchRadius;
-              const offsetY = Math.floor(Math.random() * (2 * searchRadius + 1)) - searchRadius;
-              
-              b = snakeHead.x + offsetX;
-              c = snakeHead.y + offsetY;
-
-              if (b >= 0 && b < boardWidth && c >= 0 && c < boardHeight && a.${isTileFreeCheck}(b, c)) {
-                isPositionValid = true;
-              }
-            }
-          }
-
-          if (!isPositionValid) {
-            do {
-              b = Math.floor(Math.random() * boardWidth);
-              c = Math.floor(Math.random() * boardHeight);
-            } while (!a.${isTileFreeCheck}(b, c));
-          }
-          
-          return new ${coordConstructor}(b, c);
-        }`;
-
-        code = code.replace(originalSpawnerFunc, newSpawnerFunc);
-        console.log("Логика появления яблок УСПЕШНО изменена (метод v4)!");
-
-      } else {
-        console.error("Критическая ошибка: найдена функция роста змейки, но не найдена функция спавна яблок по имени: " + spawnerFuncName);
-      }
-    } else {
-      console.error("Не удалось найти ключевую функцию роста змейки. Мод не может быть применен. Игра обновилась.");
-    }
-  } catch (err) {
-    console.error("Произошла непредвиденная ошибка при попытке изменить логику появления яблок:", err);
-  }
-  // --- КОНЕЦ ИСПРАВЛЕНИЙ ---
-
+  // Обязательно возвращаем измененный код в конце
   return code;
 }
-
-
-
-
-
 
 ////////////////////////////////////////////////////////////////////
 //RUNCODEAFTER
