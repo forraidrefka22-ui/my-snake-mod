@@ -1411,30 +1411,82 @@ window.levelEditorMod.alterSnakeCode = function(code) {
 
   // Шаг 1: Добавляем нашу вспомогательную функцию в глобальную область видимости
   const helperFunction = `
-    globalThis.MY_MOD_getAppleRespawnPos = function(context, appleIndex, originalPos) {
-      try {
-        const snakeHead = window.wholeSnakeObject.oa.ka[0];
-        if (snakeHead) {
-          let offset = 1;
-          let newX, newY;
-          let isOccupied = true;
-          while(isOccupied) {
-            isOccupied = false;
-            newX = snakeHead.x + offset;
-            newY = snakeHead.y;
-            for(let i = 0; i < context.ka.length; i++) {
-              if (i !== appleIndex && context.ka[i].pos.x === newX && context.ka[i].pos.y === newY) {
-                isOccupied = true; offset++; break;
-              }
-            }
-          }
-          originalPos.x = newX;
-          originalPos.y = newY;
-        }
-      } catch(e) {}
+  globalThis.MY_MOD_getAppleRespawnPos = function(context, appleIndex, originalPos) {
+    // --- НАСТРОЙКИ МОДА ---
+    const INTERVENTION_PROBABILITY = 1;
+    const SEARCH_RADIUS = 4;
+    // ----------------------
+
+    if (Math.random() > INTERVENTION_PROBABILITY) {
       return originalPos;
-    };
-  `;
+    }
+
+    try {
+      // --- Получаем необходимые данные из игры ---
+      const snakeHead = window.wholeSnakeObject.oa.ka[0];
+      const snakeBody = window.wholeSnakeObject.oa.ka;
+      const apples = context.ka;
+      const board = window.wholeSnakeObject[globalThis.boardDimensions];
+      // --- НОВАЯ СТРОКА: Получаем карту стен ---
+      const wallMap = window.wholeSnakeObject.Ea.oa;
+
+      // --- НОВАЯ СТРОКА: Безопасная проверка, включающая карту стен ---
+      if (!snakeHead || !board || !wallMap) return originalPos;
+
+      const validSpots = [];
+      for (let dx = -SEARCH_RADIUS; dx <= SEARCH_RADIUS; dx++) {
+        for (let dy = -SEARCH_RADIUS; dy <= SEARCH_RADIUS; dy++) {
+          if (dx === 0 && dy === 0) continue;
+
+          const newX = snakeHead.x + dx;
+          const newY = snakeHead.y + dy;
+
+          // Проверка 1: Клетка в пределах карты?
+          if (newX < 0 || newX >= board.width || newY < 0 || newY >= board.height) {
+            continue;
+          }
+
+          // --- НОВЫЙ БЛОК: Проверка 4 (ставим её раньше для эффективности) ---
+          // Проверяем, что клетка не является стеной. Любое значение > 0 считается стеной.
+          // wallMap[newY] !== undefined - защита от ошибок, если карта стен неполная
+          if (wallMap[newY] !== undefined && wallMap[newY][newX] > 0) {
+            continue;
+          }
+          // --- КОНЕЦ НОВОГО БЛОКА ---
+
+          // Проверка 2: Клетка занята телом змейки?
+          const isSnakeOnSpot = snakeBody.some(segment => segment.x === newX && segment.y === newY);
+          if (isSnakeOnSpot) {
+            continue;
+          }
+
+          // Проверка 3: Клетка занята другим яблоком?
+          const isAppleOnSpot = apples.some((apple, index) => index !== appleIndex && apple.pos.x === newX && apple.pos.y === newY);
+          if (isAppleOnSpot) {
+            continue;
+          }
+
+          validSpots.push({x: newX, y: newY});
+        }
+      }
+
+      if (validSpots.length > 0) {
+        const randomIndex = Math.floor(Math.random() * validSpots.length);
+        const luckySpot = validSpots[randomIndex];
+        
+        originalPos.x = luckySpot.x;
+        originalPos.y = luckySpot.y;
+        
+        return originalPos;
+      } else {
+        return originalPos;
+      }
+
+    } catch (e) {
+      return originalPos;
+    }
+  };
+`;
   code = appendCodeWithinSnakeModule(code, helperFunction, false);
 
   // Шаг 2: Находим текст функции респавна, используя хелпер мода
