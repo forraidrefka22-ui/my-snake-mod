@@ -1171,6 +1171,54 @@ window.levelEditorMod.alterSnakeCode = function(code) {
   funcWithResetState = assertReplace(funcWithResetState, '{', '{globalThis.megaWholeSnakeObject = this;');
   code = code.replace(funcWithResetStateOrig, funcWithResetState);
 
+  // --- ШАГ 1: ДОБАВЛЯЕМ НАШУ ЛОГИКУ КАК ОТДЕЛЬНУЮ ГЛОБАЛЬНУЮ ФУНКЦИЮ ---
+  // Этот код будет безопасно добавлен в конец всего скрипта игры.
+  const helperFunction = `
+    globalThis.MY_MOD_getAppleRespawnPos = function(context, appleIndex, originalPos) {
+      try {
+        const snakeHead = window.wholeSnakeObject.oa.ka[0];
+        if (snakeHead) {
+          let offset = 1;
+          let newX, newY;
+          let isOccupied = true;
+          
+          while(isOccupied) {
+            isOccupied = false;
+            newX = snakeHead.x + offset;
+            newY = snakeHead.y;
+            for(let i = 0; i < context.ka.length; i++) {
+              if (i !== appleIndex && context.ka[i].pos.x === newX && context.ka[i].pos.y === newY) {
+                isOccupied = true;
+                offset++;
+                break;
+              }
+            }
+          }
+          originalPos.x = newX;
+          originalPos.y = newY;
+        }
+      } catch(e) {}
+      return originalPos;
+    };
+  `;
+  code = appendCodeWithinSnakeModule(code, helperFunction, false);
+
+  // --- ШАГ 2: ВНЕДРЯЕМ ОДНУ СТРОКУ - ВЫЗОВ НАШЕЙ ФУНКЦИИ ---
+  // Находим функцию респавна по её началу
+  const respawnFuncSignature = /(function\([a-z],[a-z],[a-z]\){)/;
+  // Это единственная строка, которую мы вставим. Она вызывает нашу функцию и перезаписывает переменную `c`
+  const injectionCall = 'c=globalThis.MY_MOD_getAppleRespawnPos(a,b,c);';
+  
+  if(code.match(respawnFuncSignature)) {
+    code = code.replace(respawnFuncSignature, `$1 ${injectionCall}`);
+    console.log('[SNAKE MOD] Функция респавна яблок успешно изменена (v3).');
+  } else {
+    console.error('[SNAKE MOD] Не удалось найти функцию респавна яблок для модификации (v3).');
+  }
+
+  // --- КОНЕЦ НАШИХ ИЗМЕНЕНИЙ ---
+
+  // Остальной код из мода остается без изменений
   (0,eval)(`
   function emptyApples() {
     window.wholeSnakeObject.${appleArrayHolderOfWholeSnakeObject}.${appleArray}.length = 0;
@@ -1192,45 +1240,9 @@ window.levelEditorMod.alterSnakeCode = function(code) {
 
   let wallDetailsContainer = code.assertMatch(/[$a-zA-Z0-9_]{0,8}&&\([$a-zA-Z0-9_]{0,8}\(this\.([$a-zA-Z0-9_]{0,8}),\n?[$a-zA-Z0-9_]{0,8}\),\n?[$a-zA-Z0-9_]{0,8}\(this\.[$a-zA-Z0-9_]{0,8},7\)/)[1];
   let [,placeWallFunc,wallCoordProperty,otherProperty1,fakeWallProperty,otherProperty2] = code.assertMatch(/([$a-zA-Z0-9_]{0,8})\(this,[a-z],{([$a-zA-Z0-9_]{0,8}):[a-z],([$a-zA-Z0-9_]{0,8}:!1,[$a-zA-Z0-9_]{0,8}:-1),([$a-zA-Z0-9_]{0,8}):!0,([$a-zA-Z0-9_]{0,8}:!0,[$a-zA-Z0-9_]{0,8}:void 0)}\)/);
-  // --- КОНЕЦ ОРИГИНАЛЬНОГО КОДА МОДА ---
-
-
-  // --- НАШ БЛОК, ПЕРЕМЕЩЕННЫЙ В КОНЕЦ ФУНКЦИИ ---
-  const respawnFuncSignature = /(function\([a-z],[a-z],[a-z]\){a\.ka\[[a-z]\]\.pos=[a-z];)/;
-  if (code.match(respawnFuncSignature)) {
-    const injectionCode = `
-      try {
-        if (window.wholeSnakeObject) {
-          const snakeHead = window.wholeSnakeObject.oa.ka[0];
-          let offset = 1;
-          let newX = snakeHead.x + offset;
-          let newY = snakeHead.y;
-          let isOccupied = true;
-          while(isOccupied) {
-            isOccupied = false;
-            newX = snakeHead.x + offset;
-            for(let i = 0; i < a.ka.length; i++) {
-              if (i !== b && a.ka[i].pos.x === newX && a.ka[i].pos.y === newY) {
-                isOccupied = true;
-                offset++;
-                break;
-              }
-            }
-          }
-          c.x = newX; c.y = newY;
-        }
-      } catch(e) {}
-    `;
-    code = code.replace(respawnFuncSignature, `$1 ${injectionCode.replace(/\s+/g, ' ')}`);
-    console.log('[SNAKE MOD] Функция респавна яблок успешно изменена (v2).');
-  } else {
-    console.error('[SNAKE MOD] Не удалось найти функцию респавна яблок для модификации (v2).');
-  }
-  // --- КОНЕЦ НАШЕГО БЛОКА ---
 
   return code;
 }
-
 
 
 
