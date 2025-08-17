@@ -1448,7 +1448,7 @@ window.levelEditorMod.alterSnakeCode = function(code) {
 
   // Шаг 3: Внедряем вызов нашей функции в текст
   const injectionCall = 'c=globalThis.MY_MOD_getAppleRespawnPos(a,b,c);';
-  respawnFunc = assertReplace(respawnFunc, '{', `{${injectionCall}}`);
+  respawnFunc = assertReplace(respawnFunc, '{', `{${injectionCall}`);
 
   // Шаг 4: Заменяем старый текст функции на новый в общем коде
   code = code.replace(respawnFuncOrig, respawnFunc);
