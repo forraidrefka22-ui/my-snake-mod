@@ -1416,6 +1416,7 @@ window.levelEditorMod.alterSnakeCode = function(code) {
     const INTERVENTION_PROBABILITY = 1;
     const SEARCH_RADIUS = 4;
     // ----------------------
+    console.log("call");
 
     if (Math.random() > INTERVENTION_PROBABILITY) {
     console.log("imdumb");
@@ -1430,6 +1431,7 @@ window.levelEditorMod.alterSnakeCode = function(code) {
       const board = window.wholeSnakeObject[globalThis.boardDimensions];
       // --- НОВАЯ СТРОКА: Получаем карту стен ---
       const wallMap = window.wholeSnakeObject.Ea.oa;
+      console.log(snakeHead, snakeBody, apples, board, wallMap);
 
       // --- НОВАЯ СТРОКА: Безопасная проверка, включающая карту стен ---
       if (!snakeHead || !board || !wallMap) return originalPos;
