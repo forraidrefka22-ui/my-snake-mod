@@ -1428,7 +1428,7 @@ window.levelEditorMod.alterSnakeCode = function(code) {
       const snakeHead = window.wholeSnakeObject.oa.ka[0];
       const snakeBody = window.wholeSnakeObject.oa.ka;
       const apples = context.ka;
-      const board = window.wholeSnakeObject[globalThis.boardDimensions];
+      const board = window.wholeSnakeObject.ka.oa;
       // --- НОВАЯ СТРОКА: Получаем карту стен ---
       const wallMap = window.wholeSnakeObject.Ea.oa;
       console.log(snakeHead, snakeBody, apples, board, wallMap);
