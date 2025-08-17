@@ -1410,89 +1410,119 @@ window.levelEditorMod.alterSnakeCode = function(code) {
    // --- НАШ КОД, ИСПОЛЬЗУЮЩИЙ РАБОЧИЙ ПАТТЕРН МОДА ---
 
   // Шаг 1: Добавляем нашу вспомогательную функцию в глобальную область видимости
-  const helperFunction = `
+  // --- ШАГ 1: ФИНАЛЬНАЯ ВЕРСИЯ С ПОИСКОМ ПУТИ И КОРРЕКЦИЕЙ КАРТЫ ---
+const helperFunction = `
+  // --- НОВАЯ, ВЫСОКОТОЧНАЯ ФУНКЦИЯ ДЛЯ КОРРЕКЦИИ КАРТЫ СТЕН ---
+  globalThis.MY_MOD_createCorrectedWallMap = function(rawWallMap, board) {
+    // Создаем глубокую копию, чтобы не изменять оригинальные данные игры
+    const correctedMap = rawWallMap.map(row => [...row]);
+    const height = board.height;
+    const width = board.width;
+
+    // Если карта слишком мала, чтобы иметь углы, ничего не делаем
+    if (height < 2 || width < 2) {
+      return correctedMap;
+    }
+    
+    // ВЫПОЛНЯЕМ КОРРЕКЦИЮ ТОЧНО ПО ВАШЕМУ АЛГОРИТМУ
+    // Безопасно вычитаем 1, только если значение больше 0.
+
+    // Соседи верхнего левого угла (0,0)
+    if (correctedMap[1][0] > 0) correctedMap[1][0]--;
+    if (correctedMap[0][1] > 0) correctedMap[0][1]--;
+
+    // Соседи верхнего правого угла (width-1, 0)
+    if (correctedMap[1][width - 1] > 0) correctedMap[1][width - 1]--;
+    if (correctedMap[0][width - 2] > 0) correctedMap[0][width - 2]--;
+
+    // Соседи нижнего левого угла (0, height-1)
+    if (correctedMap[height - 1][1] > 0) correctedMap[height - 1][1]--;
+    if (correctedMap[height - 2][0] > 0) correctedMap[height - 2][0]--;
+
+    // Соседи нижнего правого угла (width-1, height-1)
+    if (correctedMap[height - 1][width - 2] > 0) correctedMap[height - 1][width - 2]--;
+    if (correctedMap[height - 2][width - 1] > 0) correctedMap[height - 2][width - 1]--;
+    
+    // ВАЖНО: После коррекции, все остальные значения > 1 все равно должны считаться стенами.
+    // Это на случай, если есть другие типы стен, о которых мы не знаем.
+    for(let y = 0; y < height; y++) {
+      for(let x = 0; x < width; x++) {
+        if(correctedMap[y][x] > 1) correctedMap[y][x] = 1;
+      }
+    }
+
+    return correctedMap;
+  };
+
+  // --- Функция поиска пути (без изменений) ---
+  globalThis.MY_MOD_findForwardPath = function(snakeHead, snakeBody, wallMap, board) {
+    const path = [];
+    const visited = new Set();
+    snakeBody.forEach(segment => visited.add(segment.x + ',' + segment.y));
+    let currentNode = {x: snakeHead.x, y: snakeHead.y};
+    for(let i = 0; i < 100; i++) {
+      const neighbors = [
+        {x: currentNode.x, y: currentNode.y - 1}, {x: currentNode.x, y: currentNode.y + 1},
+        {x: currentNode.x - 1, y: currentNode.y}, {x: currentNode.x + 1, y: currentNode.y}
+      ];
+      const validNeighbors = neighbors.filter(n => 
+        n.x >= 0 && n.x < board.width && n.y >= 0 && n.y < board.height &&
+        wallMap[n.y][n.x] === 0 && !visited.has(n.x + ',' + n.y)
+      );
+      if(validNeighbors.length === 1) {
+        currentNode = validNeighbors[0];
+        path.push(currentNode);
+        visited.add(currentNode.x + ',' + currentNode.y);
+      } else {
+        break;
+      }
+    }
+    return path;
+  };
+
   globalThis.MY_MOD_getAppleRespawnPos = function(context, appleIndex, originalPos) {
     // --- НАСТРОЙКИ МОДА ---
-    const INTERVENTION_PROBABILITY = 0.1;
-    const FORBIDDEN_RADIUS = 3;
-    const GOLDEN_RADIUS_MAX = 6;
+    const INTERVENTION_PROBABILITY = 0.6;
+    const FORBIDDEN_PATH_DISTANCE = 2;
+    const GOLDEN_PATH_DISTANCE_MAX = 15;
     // ----------------------
 
     try {
-      // --- Получаем необходимые данные из игры ---
+      if (Math.random() > INTERVENTION_PROBABILITY) return originalPos;
+
       const snakeHead = window.wholeSnakeObject.oa.ka[0];
       const snakeBody = window.wholeSnakeObject.oa.ka;
       const apples = context.ka;
-      // --- ИСПРАВЛЕНИЕ: Используем правильный путь к размерам доски, который вы нашли ---
       const board = window.wholeSnakeObject.ka.oa;
-      const wallMap = window.wholeSnakeObject.Ea.oa;
+      const rawWallMap = window.wholeSnakeObject.Ea.oa;
 
-      // Безопасная проверка с логированием в случае ошибки
-      if (!snakeHead || !board || !wallMap) {
-        console.error('[SNAKE MOD] Критическая ошибка: Не удалось получить доступ к объектам игры (snakeHead, board или wallMap).');
-        return originalPos;
-      }
+      if (!snakeHead || !board || !rawWallMap) return originalPos;
+      
+      // Шаг 1: Создаем ИСТИННУЮ карту стен и находим путь
+      const wallMap = globalThis.MY_MOD_createCorrectedWallMap(rawWallMap, board);
+      const forwardPath = globalThis.MY_MOD_findForwardPath(snakeHead, snakeBody, wallMap, board);
 
-      // --- ЛОГИРОВАНИЕ: Начало анализа ---
-      console.log('[SNAKE MOD] Анализ спавна. Игра предлагает: (' + originalPos.x + ',' + originalPos.y + ')');
+      if (forwardPath.length < FORBIDDEN_PATH_DISTANCE + 1) return originalPos;
+      
+      const isOriginalOnPath = forwardPath.some(p => p.x === originalPos.x && p.y === originalPos.y);
+      if(isOriginalOnPath) return originalPos;
+      
+      const goldenPathSegment = forwardPath.slice(FORBIDDEN_PATH_DISTANCE, GOLDEN_PATH_DISTANCE_MAX);
+      
+      const validGoldenSpots = goldenPathSegment.filter(spot => 
+        !apples.some((apple, index) => index !== appleIndex && apple.pos.x === spot.x && apple.pos.y === spot.y)
+      );
 
-      // Шаг 1: Проверка вероятности. Сначала решаем, будем ли вообще вмешиваться.
-      if (Math.random() > INTERVENTION_PROBABILITY) {
-        console.log('[SNAKE MOD] Итог: Вмешательство пропущено по вероятности.');
-        return originalPos;
-      }
-
-      const originalDistance = Math.abs(originalPos.x - snakeHead.x) + Math.abs(originalPos.y - snakeHead.y);
-
-      // Шаг 2: Проверка, не является ли предложенная позиция уже "удачной".
-      if (originalDistance <= GOLDEN_RADIUS_MAX) {
-        console.log('[SNAKE MOD] Итог: Вмешательство не требуется. Дистанция (' + originalDistance + ') уже в пределах "Золотой зоны".');
-        return originalPos;
-      }
-
-      // --- ЛОГИРОВАНИЕ: Намерение вмешаться ---
-      console.log('[SNAKE MOD] Вмешиваюсь. Дистанция (' + originalDistance + ') слишком велика. Поиск лучшего места...');
-
-      // Шаг 3: Поиск всех безопасных клеток в "Золотой зоне"
-      const validGoldenSpots = [];
-      for (let dx = -GOLDEN_RADIUS_MAX; dx <= GOLDEN_RADIUS_MAX; dx++) {
-        for (let dy = -GOLDEN_RADIUS_MAX; dy <= GOLDEN_RADIUS_MAX; dy++) {
-          const distance = Math.abs(dx) + Math.abs(dy);
-
-          if (distance <= FORBIDDEN_RADIUS || distance > GOLDEN_RADIUS_MAX) continue;
-
-          const newX = snakeHead.x + dx;
-          const newY = snakeHead.y + dy;
-
-          if (newX < 0 || newX >= board.width || newY < 0 || newY >= board.height) continue;
-          if (wallMap[newY] !== undefined && wallMap[newY][newX] > 0) continue;
-          if (snakeBody.some(segment => segment.x === newX && segment.y === newY)) continue;
-          if (apples.some((apple, index) => index !== appleIndex && apple.pos.x === newX && apple.pos.y === newY)) continue;
-
-          validGoldenSpots.push({x: newX, y: newY});
-        }
-      }
-
-      // Шаг 4: Принятие решения на основе найденных клеток
       if (validGoldenSpots.length > 0) {
         const randomIndex = Math.floor(Math.random() * validGoldenSpots.length);
         const luckySpot = validGoldenSpots[randomIndex];
-        
-        // --- ЛОГИРОВАНИЕ: Успешное вмешательство ---
-        console.info('[SNAKE MOD] Итог: Найдено ' + validGoldenSpots.length + ' подходящих мест. Яблоко перемещено в (' + luckySpot.x + ',' + luckySpot.y + ').');
-
         originalPos.x = luckySpot.x;
         originalPos.y = luckySpot.y;
-      } else {
-        // --- ЛОГИРОВАНИЕ: Неудачное вмешательство ---
-        console.warn('[SNAKE MOD] Итог: Вмешательство не удалось. Не найдено безопасных мест в "Золотой зоне". Используется позиция игры.');
       }
       
       return originalPos;
-
     } catch (e) {
-      // --- ЛОГИРОВАНИЕ: Ошибки в коде ---
-      console.error('[SNAKE MOD] Произошла ошибка во время выполнения логики:', e);
+      console.error('[SNAKE MOD] Произошла ошибка в Pathfinding-логике (vCorrectedMap):', e);
       return originalPos;
     }
   };
